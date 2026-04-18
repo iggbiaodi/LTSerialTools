@@ -82,6 +82,16 @@ public class SerialReadService extends Service<LogText> {
      */
     private Consumer<Long> onRecvBytesChanged;
 
+    /**
+     * 数据接收回调（用于自动保存等）
+     */
+    private Consumer<String> onDataReceived;
+
+    /**
+     * 是否启用内部文本追加（默认启用，可通过设置false由外部管理）
+     */
+    private boolean internalAppendEnabled = true;
+
     public SerialReadService(SerialPort comPort,
                              PromptInlineCssTextArea targetTextArea,
                              BooleanProperty timeStampDisplayProperty,
@@ -280,9 +290,16 @@ public class SerialReadService extends Service<LogText> {
     }
 
     private void appendText(String batch) {
-        targetTextArea.appendText(batch);
-        if (highlighterScheduler != null) {
-            highlighterScheduler.schedule();
+        // 调用数据接收回调（用于自动保存等）
+        if (onDataReceived != null) {
+            onDataReceived.accept(batch);
+        }
+        // 内部文本追加
+        if (internalAppendEnabled) {
+            targetTextArea.appendText(batch);
+            if (highlighterScheduler != null) {
+                highlighterScheduler.schedule();
+            }
         }
     }
 
@@ -391,6 +408,20 @@ public class SerialReadService extends Service<LogText> {
      */
     public void setOnRecvBytesChanged(Consumer<Long> callback) {
         this.onRecvBytesChanged = callback;
+    }
+
+    /**
+     * 设置数据接收回调
+     */
+    public void setOnDataReceived(Consumer<String> callback) {
+        this.onDataReceived = callback;
+    }
+
+    /**
+     * 设置是否启用内部文本追加
+     */
+    public void setInternalAppendEnabled(boolean enabled) {
+        this.internalAppendEnabled = enabled;
     }
 
     /**

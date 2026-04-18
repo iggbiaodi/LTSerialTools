@@ -5,6 +5,9 @@ import indi.lt.serialtool.SerialApplication;
 import indi.lt.serialtool.component.CommandTableView;
 import indi.lt.serialtool.global.ConfigManager;
 import indi.lt.serialtool.global.ThemeManager;
+import indi.lt.serialtool.service.AutoSaveService;
+import indi.lt.serialtool.utils.ZipUtil;
+import indi.lt.serialtool.utils.UIUtil;
 import indi.lt.serialtool.view.AsciiStage;
 import indi.lt.serialtool.view.SerialReceivePane;
 import indi.lt.serialtool.view.SerialSendPane;
@@ -18,12 +21,16 @@ import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
+import javafx.stage.FileChooser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.kordamp.ikonli.javafx.FontIcon;
 
 import java.awt.Desktop;
+import java.io.File;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URL;
@@ -46,7 +53,6 @@ import static org.kordamp.ikonli.material2.Material2OutlinedMZ.TUNE;
 
 public class MainController implements Initializable {
     private static final String KEY_AUTO_SAVE = "main.form.autoSave";
-    private static final String KEY_BUFFER_WARNING = "main.form.bufferWarning";
 
     private final Logger LOG = LogManager.getLogger(MainController.class);
 
@@ -61,10 +67,19 @@ public class MainController implements Initializable {
     public MenuButton mbSetting;
 
     public CheckMenuItem autoSaveCheck;
-    public CheckMenuItem bufferWarningCheck;
 
     @FXML
     public MenuItem menuReceiveTimeout;
+
+    // 自动保存相关菜单项
+    @FXML
+    public MenuItem menuAutoSaveInterval;
+    @FXML
+    public MenuItem menuAutoSaveFileSize;
+    @FXML
+    public MenuItem menuBufferCapacity;
+    @FXML
+    public MenuItem menuSaveAsZip;
 
     public MenuButton mbTools;
     public MenuButton mbHelp;
@@ -154,16 +169,25 @@ public class MainController implements Initializable {
             }
         });
 
-        autoSaveCheck.setSelected(ConfigManager.get(KEY_AUTO_SAVE, Boolean.class, false));
-        bufferWarningCheck.setSelected(ConfigManager.get(KEY_BUFFER_WARNING, Boolean.class, false));
-        autoSaveCheck.selectedProperty().addListener((obs, oldVal, newVal) -> ConfigManager.put(KEY_AUTO_SAVE, String.valueOf(newVal)));
-        bufferWarningCheck.selectedProperty().addListener((obs, oldVal, newVal) -> ConfigManager.put(KEY_BUFFER_WARNING, String.valueOf(newVal)));
-        autoSaveCheck.setOnAction(e -> {
-            boolean enabled = autoSaveCheck.isSelected();
-            System.out.println("自动保存: " + enabled);
+        autoSaveCheck.setSelected(AutoSaveService.isAutoSaveEnabled());
+        autoSaveCheck.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            AutoSaveService.setAutoSaveEnabled(newVal);
+            updateAutoSaveForAllPanes(newVal);
         });
 
         refreshReceiveTimeoutMenuText();
+        refreshAutoSaveIntervalMenuText();
+        refreshAutoSaveFileSizeMenuText();
+        refreshBufferCapacityMenuText();
+    }
+
+    /**
+     * 更新所有接收面板的自动保存状态
+     */
+    private void updateAutoSaveForAllPanes(boolean enabled) {
+        for (SerialReceivePane pane : receivePanes) {
+            pane.getController().updateAutoSaveService(enabled);
+        }
     }
 
     @FXML
@@ -184,7 +208,7 @@ public class MainController implements Initializable {
                 if (timeoutMs <= 0) {
                     throw new NumberFormatException("timeoutMs <= 0");
                 }
-                ConfigManager.put(KEY_RECEIVE_TIMEOUT_MS, String.valueOf(timeoutMs));
+                ConfigManager.set(KEY_RECEIVE_TIMEOUT_MS, String.valueOf(timeoutMs));
                 refreshReceiveTimeoutMenuText();
             } catch (NumberFormatException ex) {
                 Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -211,6 +235,265 @@ public class MainController implements Initializable {
             return;
         }
         menuReceiveTimeout.setText("设置接收超时时间 (" + getReceiveTimeoutMs() + "ms)");
+    }
+
+    // ========== 自动保存间隔时间设置 ==========
+
+    @FXML
+    public void setAutoSaveInterval(ActionEvent actionEvent) {
+        int currentValue = AutoSaveService.getAutoSaveInterval();
+        TextInputDialog dialog = new TextInputDialog(String.valueOf(currentValue));
+        dialog.setTitle("设置自动保存间隔时间");
+        dialog.setHeaderText("单位：秒。自动保存将按照此间隔触发。");
+        dialog.setContentText("间隔时间(秒):");
+
+        dialog.showAndWait().ifPresent(input -> {
+            String value = input.trim();
+            if (value.isEmpty()) {
+                return;
+            }
+            try {
+                int interval = Integer.parseInt(value);
+                if (interval < 1) {
+                    throw new NumberFormatException("interval < 1");
+                }
+                AutoSaveService.setAutoSaveInterval(interval);
+                refreshAutoSaveIntervalMenuText();
+                UIUtil.showToast("自动保存间隔已设置为 " + interval + " 秒");
+            } catch (NumberFormatException ex) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("参数错误");
+                alert.setHeaderText("间隔时间必须是大于0的整数");
+                alert.setContentText("示例: 5 (单位 秒)");
+                alert.showAndWait();
+            }
+        });
+    }
+
+    private void refreshAutoSaveIntervalMenuText() {
+        if (menuAutoSaveInterval == null) {
+            return;
+        }
+        menuAutoSaveInterval.setText("设置自动保存间隔时间 (" + AutoSaveService.getAutoSaveInterval() + "秒)");
+    }
+
+    // ========== 自动保存文件大小设置 ==========
+
+    @FXML
+    public void setAutoSaveFileSize(ActionEvent actionEvent) {
+        int currentSize = AutoSaveService.getAutoSaveFileSize();
+        String currentUnit = AutoSaveService.getAutoSaveFileSizeUnit();
+
+        Dialog<String[]> dialog = new Dialog<>();
+        dialog.setTitle("设置自动保存文件大小");
+        dialog.setHeaderText("设置单个日志文件的最大大小");
+
+        // 设置按钮
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+        // 创建输入布局
+        TextField sizeField = new TextField(String.valueOf(currentSize));
+        sizeField.setPrefWidth(80);
+
+        ComboBox<String> unitBox = new ComboBox<>();
+        unitBox.getItems().addAll("KB", "MB");
+        unitBox.setValue(currentUnit);
+        unitBox.setPrefWidth(80);
+
+        HBox content = new HBox(10);
+        content.getChildren().addAll(new Label("文件大小:"), sizeField, unitBox);
+        content.setPadding(new javafx.geometry.Insets(10));
+
+        dialog.getDialogPane().setContent(content);
+
+        // 结果转换器
+        dialog.setResultConverter(buttonType -> {
+            if (buttonType == ButtonType.OK) {
+                return new String[]{sizeField.getText(), unitBox.getValue()};
+            }
+            return null;
+        });
+
+        dialog.showAndWait().ifPresent(result -> {
+            try {
+                int size = Integer.parseInt(result[0].trim());
+                if (size < 1) {
+                    throw new NumberFormatException("size < 1");
+                }
+                String unit = result[1];
+                AutoSaveService.setAutoSaveFileSize(size, unit);
+                refreshAutoSaveFileSizeMenuText();
+                UIUtil.showToast("自动保存文件大小已设置为 " + size + unit);
+            } catch (NumberFormatException ex) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("参数错误");
+                alert.setHeaderText("文件大小必须是大于0的整数");
+                alert.setContentText("示例: 10 (单位 MB)");
+                alert.showAndWait();
+            }
+        });
+    }
+
+    private void refreshAutoSaveFileSizeMenuText() {
+        if (menuAutoSaveFileSize == null) {
+            return;
+        }
+        menuAutoSaveFileSize.setText("设置自动保存文件大小 (" + AutoSaveService.getAutoSaveFileSizeWithUnit() + ")");
+    }
+
+    // ========== 显示缓冲区容量设置 ==========
+
+    public static final String KEY_BUFFER_CAPACITY = "main.form.bufferCapacity";
+    public static final String KEY_BUFFER_CAPACITY_UNIT = "main.form.bufferCapacityUnit";
+    public static final int DEFAULT_BUFFER_CAPACITY = 10; // 默认10MB
+    public static final String DEFAULT_BUFFER_CAPACITY_UNIT = "MB";
+
+    @FXML
+    public void setBufferCapacity(ActionEvent actionEvent) {
+        int currentSize = getBufferCapacity();
+        String currentUnit = getBufferCapacityUnit();
+
+        Dialog<String[]> dialog = new Dialog<>();
+        dialog.setTitle("设置显示缓冲区容量");
+        dialog.setHeaderText("设置接收数据在内存中的最大容量\n当数据达到此大小时，将丢弃最早的数据");
+
+        // 设置按钮
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+        // 创建输入布局
+        TextField sizeField = new TextField(String.valueOf(currentSize));
+        sizeField.setPrefWidth(80);
+
+        ComboBox<String> unitBox = new ComboBox<>();
+        unitBox.getItems().addAll("KB", "MB");
+        unitBox.setValue(currentUnit);
+        unitBox.setPrefWidth(80);
+
+        HBox content = new HBox(10);
+        content.getChildren().addAll(new Label("缓冲区大小:"), sizeField, unitBox);
+        content.setPadding(new javafx.geometry.Insets(10));
+
+        dialog.getDialogPane().setContent(content);
+
+        // 结果转换器
+        dialog.setResultConverter(buttonType -> {
+            if (buttonType == ButtonType.OK) {
+                return new String[]{sizeField.getText(), unitBox.getValue()};
+            }
+            return null;
+        });
+
+        dialog.showAndWait().ifPresent(result -> {
+            try {
+                int size = Integer.parseInt(result[0].trim());
+                if (size < 1) {
+                    throw new NumberFormatException("size < 1");
+                }
+                String unit = result[1];
+                setBufferCapacity(size, unit);
+                refreshBufferCapacityMenuText();
+
+                // 更新所有接收面板的缓冲区容量
+                long capacityBytes = unit.equalsIgnoreCase("KB") ? size * 1024L : size * 1024L * 1024L;
+                for (SerialReceivePane pane : receivePanes) {
+                    pane.getController().updateBufferCapacity(capacityBytes);
+                }
+
+                UIUtil.showToast("显示缓冲区容量已设置为 " + size + unit);
+            } catch (NumberFormatException ex) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("参数错误");
+                alert.setHeaderText("容量必须是大于0的整数");
+                alert.setContentText("示例: 10 (单位 MB)");
+                alert.showAndWait();
+            }
+        });
+    }
+
+    private void refreshBufferCapacityMenuText() {
+        if (menuBufferCapacity == null) {
+            return;
+        }
+        menuBufferCapacity.setText("设置显示缓冲区容量 (" + getBufferCapacityWithUnit() + ")");
+    }
+
+    public static int getBufferCapacity() {
+        return ConfigManager.get(KEY_BUFFER_CAPACITY, Integer.class, DEFAULT_BUFFER_CAPACITY);
+    }
+
+    public static String getBufferCapacityUnit() {
+        String unit = ConfigManager.get(KEY_BUFFER_CAPACITY_UNIT, DEFAULT_BUFFER_CAPACITY_UNIT);
+        return unit != null && (unit.equalsIgnoreCase("KB") || unit.equalsIgnoreCase("MB"))
+                ? unit.toUpperCase()
+                : DEFAULT_BUFFER_CAPACITY_UNIT;
+    }
+
+    public static String getBufferCapacityWithUnit() {
+        return getBufferCapacity() + getBufferCapacityUnit();
+    }
+
+    public static void setBufferCapacity(int size, String unit) {
+        if (size < 1) size = 1;
+        String validUnit = (unit != null && unit.equalsIgnoreCase("KB")) ? "KB" : "MB";
+        ConfigManager.set(KEY_BUFFER_CAPACITY, size);
+        ConfigManager.set(KEY_BUFFER_CAPACITY_UNIT, validUnit);
+    }
+
+    // ========== 保存为压缩包 ==========
+
+    @FXML
+    public void saveAsZip(ActionEvent actionEvent) {
+        // 收集所有接收面板的数据
+        List<String> allData = new ArrayList<>();
+        int paneIndex = 1;
+        for (SerialReceivePane pane : receivePanes) {
+            String data = pane.getController().getOriginData();
+            if (data != null && !data.isEmpty()) {
+                allData.add("=== 串口接收" + paneIndex + " ===\n" + data);
+            }
+            paneIndex++;
+        }
+
+        if (allData.isEmpty()) {
+            UIUtil.showToast("没有数据可保存");
+            return;
+        }
+
+        // 选择保存位置
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("保存为压缩包");
+        fileChooser.setInitialFileName("serial-data-" + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + ".zip");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("ZIP压缩包", "*.zip"));
+
+        File file = fileChooser.showSaveDialog(rootPane.getScene().getWindow());
+        if (file == null) {
+            return;
+        }
+
+        // 选择分卷大小
+        ChoiceDialog<String> sizeDialog = new ChoiceDialog<>("10MB", "1MB", "5MB", "10MB", "50MB", "100MB", "不分卷");
+        sizeDialog.setTitle("设置分卷大小");
+        sizeDialog.setHeaderText("选择每个分卷文件的大小");
+        sizeDialog.setContentText("分卷大小:");
+
+        sizeDialog.showAndWait().ifPresent(sizeStr -> {
+            try {
+                int partSizeMB;
+                if ("不分卷".equals(sizeStr)) {
+                    partSizeMB = 1024; // 1GB作为不分卷的阈值
+                } else {
+                    partSizeMB = Integer.parseInt(sizeStr.replace("MB", ""));
+                }
+
+                String combinedData = String.join("\n\n", allData);
+                ZipUtil.saveToZip(combinedData, file, partSizeMB, "serial-data");
+
+                UIUtil.showToast("数据已保存到: " + file.getName());
+            } catch (IOException e) {
+                LOG.error("保存压缩包失败", e);
+                UIUtil.showToast("保存失败: " + e.getMessage());
+            }
+        });
     }
 
     public String getDividePosition() {
@@ -252,7 +535,6 @@ public class MainController implements Initializable {
 
     public void persistFormStateToConfig() {
         ConfigManager.put(KEY_AUTO_SAVE, String.valueOf(autoSaveCheck.isSelected()));
-        ConfigManager.put(KEY_BUFFER_WARNING, String.valueOf(bufferWarningCheck.isSelected()));
         serialSendPane.getController().persistFormStateToConfig();
         for (SerialReceivePane pane : receivePanes) {
             pane.getController().persistFormStateToConfig();

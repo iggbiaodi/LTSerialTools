@@ -113,19 +113,7 @@ object ConfigManager {
     fun <T> get(key: String?, clazz: Class<T>, defaultValue: T): T {
         val value = props.getProperty(key)
         return if (value != null) {
-            try {
-                when (clazz) {
-                    Int::class.java -> value.toInt() as T
-                    Long::class.java -> value.toLong() as T
-                    Boolean::class.java -> value.toBoolean() as T
-                    Float::class.java -> value.toFloat() as T
-                    Double::class.java -> value.toDouble() as T
-                    String::class.java -> value as T
-                    else -> defaultValue
-                }
-            } catch (e: Exception) {
-                defaultValue
-            }
+            parseTypedValue(value, clazz) ?: defaultValue
         } else {
             defaultValue
         }
@@ -136,20 +124,25 @@ object ConfigManager {
     fun <T> get(key: String?, clazz: Class<T>): T? {
         val value = props.getProperty(key)
         return if (value != null) {
-            try {
-                when (clazz) {
-                    Int::class.java -> value.toInt() as T
-                    Long::class.java -> value.toLong() as T
-                    Boolean::class.java -> value.toBoolean() as T
-                    Float::class.java -> value.toFloat() as T
-                    Double::class.java -> value.toDouble() as T
-                    String::class.java -> value as T
-                    else -> null
-                }
-            } catch (e: Exception) {
-                null
-            }
+            parseTypedValue(value, clazz)
         } else {
+            null
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> parseTypedValue(value: String, clazz: Class<T>): T? {
+        return try {
+            when (clazz) {
+                Int::class.java, java.lang.Integer::class.java -> value.toInt() as T
+                Long::class.java, java.lang.Long::class.java -> value.toLong() as T
+                Boolean::class.java, java.lang.Boolean::class.java -> value.toBoolean() as T
+                Float::class.java, java.lang.Float::class.java -> value.toFloat() as T
+                Double::class.java, java.lang.Double::class.java -> value.toDouble() as T
+                String::class.java -> value as T
+                else -> null
+            }
+        } catch (e: Exception) {
             null
         }
     }

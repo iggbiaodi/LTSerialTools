@@ -4,14 +4,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-## 构建和运行
-
-### 构建项目
-
-## 代码架构
-
-### 核心组件
-
 1. **FXML 文件** (`src/main/resources/fxml/`)
    - `main-view.fxml`: 主界面布局
    - `serial-send-pane.fxml`: 发送模式界面
@@ -96,10 +88,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 固定规则
 - 尽量使用纯java代码，禁止添加新的fxml文件
 - 新增功能不要影响现有功能，如果需要影响，请向我确认
-- 注意不要在javafx的UI线程中执行耗时让我
+- 注意不要在javafx的UI线程中执行耗时任务
 
 ## Token消耗问题
 - 当需要执行消耗大量Token的任务时，通知我确认
+- 回复时直说你做了什么，不要说为什么这么做
+- 不要偷偷做我没让你干的事情，如果破坏现有的正常功能，我会非常生气
 
 ## 编译验证
 - 当需要执行`gradle`命令进行编译验证时，将需要验证的命令返回给我，不用擅自执行

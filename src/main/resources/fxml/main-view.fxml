@@ -4,6 +4,7 @@
 <?import javafx.scene.control.CheckMenuItem?>
 <?import javafx.scene.control.MenuButton?>
 <?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.SeparatorMenuItem?>
 <?import javafx.scene.control.TabPane?>
 <?import javafx.scene.control.ToolBar?>
 <?import javafx.scene.input.KeyCodeCombination?>
@@ -22,7 +23,7 @@
                 <Button fx:id="mbNewTab" mnemonicParsing="false" onAction="#addNewTab"/>
                 <MenuButton fx:id="mbFile" mnemonicParsing="false">
                     <items>
-                        <MenuItem mnemonicParsing="false" text="保存为压缩包">
+                        <MenuItem fx:id="menuSaveAsZip" mnemonicParsing="false" onAction="#saveAsZip" text="保存为压缩包">
                             <accelerator>
                                 <KeyCodeCombination alt="UP" code="S" control="DOWN" meta="UP" shift="UP" shortcut="UP"/>
                             </accelerator>
@@ -32,10 +33,12 @@
                 <MenuButton fx:id="mbSetting" mnemonicParsing="false">
                     <items>
                         <CheckMenuItem fx:id="autoSaveCheck" mnemonicParsing="false" text="自动保存"/>
-                        <MenuItem mnemonicParsing="false" text="设置自动保存超时时间"/>
-                        <MenuItem mnemonicParsing="false" text="设置自动保存文件大小"/>
-                        <CheckMenuItem fx:id="bufferWarningCheck" mnemonicParsing="false" text="提示缓冲区达到90%容量"/>
-                        <MenuItem mnemonicParsing="false" text="设置显示缓冲区容量"/>
+                        <SeparatorMenuItem/>
+                        <MenuItem fx:id="menuAutoSaveInterval" mnemonicParsing="false" onAction="#setAutoSaveInterval" text="设置自动保存间隔时间"/>
+                        <MenuItem fx:id="menuAutoSaveFileSize" mnemonicParsing="false" onAction="#setAutoSaveFileSize" text="设置自动保存文件大小"/>
+                        <SeparatorMenuItem/>
+                        <MenuItem fx:id="menuBufferCapacity" mnemonicParsing="false" onAction="#setBufferCapacity" text="设置显示缓冲区容量"/>
+                        <SeparatorMenuItem/>
                         <MenuItem fx:id="menuReceiveTimeout" mnemonicParsing="false" onAction="#setReceiveTimeout" text="设置接收超时时间"/>
                     </items>
                 </MenuButton>

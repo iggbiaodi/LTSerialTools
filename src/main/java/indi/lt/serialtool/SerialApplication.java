@@ -2,6 +2,7 @@ package indi.lt.serialtool;
 
 import github.nonoas.jfx.flat.ui.AppState;
 import github.nonoas.jfx.flat.ui.AutoReleaseApplication;
+import github.nonoas.jfx.flat.ui.stage.ExceptionAlert;
 import github.nonoas.jfx.flat.ui.theme.LightTheme;
 import indi.lt.serialtool.component.CommandTableView;
 import indi.lt.serialtool.controller.MainController;
@@ -30,43 +31,46 @@ import static indi.lt.serialtool.global.ConfigManager.KEY_RECEIVE_SPLIT_PANE_DIV
 
 public class SerialApplication extends AutoReleaseApplication {
 
-    private final Logger LOG = LogManager.getLogger(MainController.class);
+    private final Logger LOG = LogManager.getLogger(SerialApplication.class);
 
     private MainController controller;
     private volatile boolean shutdownInProgress;
     private volatile boolean shutdownSaveCompleted;
 
     @Override
-    public void start(Stage stage) throws IOException {
-        // 全局UI线程异常捕获
-        Thread.currentThread().setUncaughtExceptionHandler((t, e) -> LOG.error("未知异常", e));
+    public void start(Stage stage) {
+        try {
+            setUserAgentStylesheet(new LightTheme().getUserAgentStylesheet());
 
-        // 注意资源路径，通常加前导斜杠更稳
-        FXMLLoader fxmlLoader = new FXMLLoader(SerialApplication.class.getResource("/fxml/main-view.fxml"));
-        // 先加载 -> 创建场景图和 Controller 并完成 @FXML 注入
-        Parent root = fxmlLoader.load();
-        // 再拿 Controller
-        controller = fxmlLoader.getController();
+            // 注意资源路径，通常加前导斜杠更稳
+            FXMLLoader fxmlLoader = new FXMLLoader(SerialApplication.class.getResource("/fxml/main-view.fxml"));
+            // 先加载 -> 创建场景图和 Controller 并完成 @FXML 注入
+            Parent root = fxmlLoader.load();
+            // 再拿 Controller
+            controller = fxmlLoader.getController();
 
-        setUserAgentStylesheet(new LightTheme().getUserAgentStylesheet());
+            MainStage appStage = new MainStage();
+            appStage.setTitle("LTSerialTool");
 
-        MainStage appStage = new MainStage();
-        appStage.setTitle("LTSerialTool-v2.16.0");
+            StackPane rootPane = new StackPane(root);
+            HeaderBar headerBar = appStage.getHeaderBar();
+            headerBar.setViewOrder(-1);
+            headerBar.setMaxWidth(Region.USE_PREF_SIZE);
+            headerBar.setMaxHeight(Region.USE_PREF_SIZE);
+            StackPane.setAlignment(headerBar, Pos.TOP_RIGHT);
+            rootPane.getChildren().add(headerBar);
+            appStage.setContentView(rootPane);
+            // 现在 controller 已经不是 null 了，且其 @FXML 成员已注入
+            appStage.registryDragger(controller.getMenuBar());
 
-        StackPane rootPane = new StackPane(root);
-        HeaderBar headerBar = appStage.getHeaderBar();
-        headerBar.setViewOrder(-1);
-        headerBar.setMaxWidth(Region.USE_PREF_SIZE);
-        headerBar.setMaxHeight(Region.USE_PREF_SIZE);
-        StackPane.setAlignment(headerBar, Pos.TOP_RIGHT);
-        rootPane.getChildren().add(headerBar);
-        appStage.setContentView(rootPane);
-        // 现在 controller 已经不是 null 了，且其 @FXML 成员已注入
-        appStage.registryDragger(controller.getMenuBar());
+            AppState.setStage(appStage.getStage());
+            appStage.getStage().setOnCloseRequest(this::handleCloseRequest);
+            appStage.show();
+        } catch (Exception e) {
+            LOG.error("未知异常", e);
+            ExceptionAlert.error(e);
+        }
 
-        AppState.setStage(appStage.getStage());
-        appStage.getStage().setOnCloseRequest(this::handleCloseRequest);
-        appStage.show();
     }
 
     @Override
@@ -136,7 +140,12 @@ public class SerialApplication extends AutoReleaseApplication {
 
     private void saveLayoutToMemory() {
         if (controller != null) {
-            controller.persistFormStateToConfig();
+            try {
+                controller.persistFormStateToConfig();
+            } catch (Exception e) {
+                LOG.error(e);
+                ExceptionAlert.error(e);
+            }
         }
         Stage stage = AppState.getStage();
         if (stage == null) {

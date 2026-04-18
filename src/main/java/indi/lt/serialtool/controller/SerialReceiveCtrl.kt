@@ -1,12 +1,11 @@
 package indi.lt.serialtool.controller
 
 import com.fazecast.jSerialComm.SerialPort
-import indi.lt.serialtool.component.InlineCssRegexHighlighter
-import indi.lt.serialtool.component.PromptInlineCssTextArea
-import indi.lt.serialtool.component.SerialPortCombBox
-import indi.lt.serialtool.component.SerialToggleButton
+import indi.lt.serialtool.component.*
+import indi.lt.serialtool.data.CircularByteBuffer
 import indi.lt.serialtool.data.SerialPortSettings
 import indi.lt.serialtool.global.ConfigManager
+import indi.lt.serialtool.service.AutoSaveService
 import indi.lt.serialtool.service.SerialReadService
 import indi.lt.serialtool.utils.UIUtil
 import javafx.application.Platform
@@ -18,6 +17,7 @@ import javafx.fxml.FXMLLoader
 import javafx.fxml.Initializable
 import javafx.scene.control.*
 import javafx.scene.layout.BorderPane
+import javafx.scene.layout.HBox
 import javafx.stage.FileChooser
 import javafx.util.Callback
 import org.apache.logging.log4j.LogManager
@@ -76,6 +76,10 @@ class SerialReceiveCtrl : Initializable {
     @FXML
     private lateinit var btnMoreSettings: Button
 
+    // 状态指示灯
+    @FXML
+    private var statusIndicator: StatusIndicator? = null
+
     // === 内部变量 ===
     private var serialReadService: SerialReadService? = null
     private var highlighter: InlineCssRegexHighlighter? = null
@@ -84,10 +88,22 @@ class SerialReceiveCtrl : Initializable {
     // 串口参数设置
     private var serialPortSettings: SerialPortSettings = SerialPortSettings.createDefault()
 
+    // 自动保存服务
+    private var autoSaveService: AutoSaveService? = null
+
+    // 环形缓冲区（用于限制内存中的数据大小）
+    private val circularBuffer: CircularByteBuffer = CircularByteBuffer()
+
+    // 接收数据缓存（用于自动保存）
+    private val receiveBuffer = StringBuilder()
+
     override fun initialize(url: URL?, resourceBundle: ResourceBundle?) {
         initBautRateList()
         registerSerialEvent()
         bindFormStatePersistence()
+        initCircularBuffer()
+        initAutoSaveService()
+        initStatusIndicator()
     }
 
     private fun persistenceScope(): String {
@@ -104,7 +120,11 @@ class SerialReceiveCtrl : Initializable {
     }
 
     private fun applyPersistedState() {
-        serialPortSettings = ConfigManager.getObject(serialSettingsKey(), SerialPortSettings::class.java, SerialPortSettings.createDefault())
+        serialPortSettings = ConfigManager.getObject(
+            serialSettingsKey(),
+            SerialPortSettings::class.java,
+            SerialPortSettings.createDefault()
+        )
         cbSerialList.setSerialPortSettings(serialPortSettings)
         cbBautRateList.selectionModel.select(serialPortSettings.baudRate)
         cbBautRateList.value = serialPortSettings.baudRate
@@ -215,8 +235,11 @@ class SerialReceiveCtrl : Initializable {
     @FXML
     private fun clearLogs() {
         textAreaOrigin.area.clear()
+        circularBuffer.clear()
+        receiveBuffer.setLength(0)
         serialReadService?.resetRecvBytesCount()
         lbRecvBytes.text = "0 B"
+        statusIndicator?.setNormal()
     }
 
     @FXML
@@ -279,6 +302,10 @@ class SerialReceiveCtrl : Initializable {
             highlighter = InlineCssRegexHighlighter(textAreaOrigin).apply {
                 patternTextProperty().bind(tfKeyWord.textProperty())
             }
+            // 清空之前的缓冲区
+            circularBuffer.clear()
+            textAreaOrigin.area.clear()
+
             serialReadService = SerialReadService(
                 cbSerialList.selectedPort,
                 textAreaOrigin,
@@ -291,7 +318,28 @@ class SerialReceiveCtrl : Initializable {
                         lbRecvBytes.text = formatBytes(bytes)
                     }
                 }
+                // 禁用内部文本追加，改为通过回调管理
+                it.setInternalAppendEnabled(false)
+                // 设置数据接收回调，用于自动保存和环形缓冲区
+                it.setOnDataReceived { data ->
+                    // 添加到环形缓冲区
+                    circularBuffer.append(data)
+                    // 更新文本区域
+                    Platform.runLater {
+                        textAreaOrigin.setText(circularBuffer.content)
+                        highlighter?.schedule()
+                    }
+                    // 添加到自动保存队列（移除换行符用于日志记录）
+                    val logData = data.trimEnd('\n', '\r')
+                    if (logData.isNotEmpty()) {
+                        autoSaveService?.appendData(logData)
+                    }
+                }
                 it.start()
+            }
+            // 如果自动保存启用，确保服务在运行
+            if (AutoSaveService.isAutoSaveEnabled()) {
+                autoSaveService?.restart()
             }
         }
         cbSerialList.setOnOpenFailed {
@@ -337,7 +385,89 @@ class SerialReceiveCtrl : Initializable {
         // 先取消读取服务，避免先关串口导致 read 线程报误错误日志
         serialReadService?.cancel()
         serialReadService = null
+        // 停止自动保存服务并刷新数据
+        autoSaveService?.flush()
         cbSerialList.closeSelectSerial()
+    }
+
+    /**
+     * 初始化状态指示灯
+     */
+    private fun initStatusIndicator() {
+        // 查找或创建状态指示灯
+        Platform.runLater {
+            val parent = lbRecvBytes.parent
+            if (parent is HBox) {
+                // 如果还没有状态指示灯，创建一个
+                if (statusIndicator == null) {
+                    statusIndicator = StatusIndicator()
+                }
+                // 插入到接收量标签之前
+                val index = parent.children.indexOf(lbRecvBytes)
+                if (index >= 0 && !parent.children.contains(statusIndicator)) {
+                    parent.children.add(index, statusIndicator)
+                    parent.children.add(index + 1, Label("  ")) // 添加间距
+                }
+            }
+        }
+    }
+
+    /**
+     * 初始化环形缓冲区
+     */
+    private fun initCircularBuffer() {
+        // 从配置读取缓冲区容量
+        val size = MainController.getBufferCapacity()
+        val unit = MainController.getBufferCapacityUnit()
+        val capacityBytes = if (unit.equals("KB", ignoreCase = true)) size * 1024L else size * 1024L * 1024L
+
+        circularBuffer.setCapacity(capacityBytes)
+
+        // 设置溢出回调
+        circularBuffer.setOverflowCallback { isOverflow ->
+            Platform.runLater {
+                statusIndicator?.setOverflow(isOverflow)
+            }
+        }
+    }
+
+    /**
+     * 初始化自动保存服务
+     */
+    private fun initAutoSaveService() {
+        autoSaveService = AutoSaveService()
+
+        // 如果自动保存已启用，启动服务
+        if (AutoSaveService.isAutoSaveEnabled()) {
+            autoSaveService?.start()
+        }
+    }
+
+    /**
+     * 更新自动保存服务状态
+     */
+    fun updateAutoSaveService(enabled: Boolean) {
+        if (enabled) {
+            if (autoSaveService?.state != javafx.concurrent.Worker.State.RUNNING) {
+                autoSaveService?.restart()
+            }
+        } else {
+            autoSaveService?.cancel()
+        }
+    }
+
+    /**
+     * 更新缓冲区容量
+     */
+    fun updateBufferCapacity(capacityBytes: Long) {
+        circularBuffer.setCapacity(capacityBytes)
+    }
+
+    /**
+     * 获取原始数据
+     */
+    fun getOriginData(): String {
+        return textAreaOrigin.text ?: ""
     }
 
     private fun initBautRateList() {
@@ -367,7 +497,11 @@ class SerialReceiveCtrl : Initializable {
         ConfigManager.put(formKey("keyword"), tfKeyWord.text ?: "")
 
         cbBautRateList.value?.let {
-            serialPortSettings.baudRate = it
+            try {
+                serialPortSettings.baudRate = it
+            } catch (ignore: NumberFormatException) {
+
+            }
         }
         ConfigManager.putObject(serialSettingsKey(), serialPortSettings)
     }

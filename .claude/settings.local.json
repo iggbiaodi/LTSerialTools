@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(gradle run:*)",
-      "Bash(./gradlew run:*)"
+      "Bash(./gradlew run:*)",
+      "Bash(cd /d D:\\\\MyCode\\\\IDEA\\\\LTSerialTool)",
+      "Bash(gradle compileJava compileKotlin)",
+      "Bash(./gradlew compileJava compileKotlin)"
     ]
   }
 }
