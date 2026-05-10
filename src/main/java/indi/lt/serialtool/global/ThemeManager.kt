@@ -1,8 +1,6 @@
 package indi.lt.serialtool.global
 
-import github.nonoas.jfx.flat.ui.theme.DarkTheme
-import github.nonoas.jfx.flat.ui.theme.LightTheme
-import github.nonoas.jfx.flat.ui.theme.Theme
+import github.nonoas.jfx.flat.ui.theme.*
 
 /**
  * @author Nonoas
@@ -12,5 +10,14 @@ import github.nonoas.jfx.flat.ui.theme.Theme
 object ThemeManager {
     @JvmStatic
     val all: List<Theme>
-        get() = listOf(DarkTheme(), LightTheme())
+        get() = listOf(
+            Claude(),
+            CupertinoDark(),
+            CupertinoLight(),
+            Dracula(),
+            NordDark(),
+            NordLight(),
+            PrimerDark(),
+            PrimerLight()
+        )
 }

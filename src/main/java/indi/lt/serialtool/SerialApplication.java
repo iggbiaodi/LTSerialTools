@@ -3,7 +3,7 @@ package indi.lt.serialtool;
 import github.nonoas.jfx.flat.ui.AppState;
 import github.nonoas.jfx.flat.ui.AutoReleaseApplication;
 import github.nonoas.jfx.flat.ui.stage.ExceptionAlert;
-import github.nonoas.jfx.flat.ui.theme.LightTheme;
+import github.nonoas.jfx.flat.ui.theme.PrimerLight;
 import indi.lt.serialtool.component.CommandTableView;
 import indi.lt.serialtool.controller.MainController;
 import indi.lt.serialtool.data.CommandRepository;
@@ -24,7 +24,6 @@ import javafx.stage.WindowEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.IOException;
 import java.util.List;
 
 import static indi.lt.serialtool.global.ConfigManager.KEY_RECEIVE_SPLIT_PANE_DIVIDER_POSITIONS;
@@ -40,7 +39,7 @@ public class SerialApplication extends AutoReleaseApplication {
     @Override
     public void start(Stage stage) {
         try {
-            setUserAgentStylesheet(new LightTheme().getUserAgentStylesheet());
+            setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
 
             // 注意资源路径，通常加前导斜杠更稳
             FXMLLoader fxmlLoader = new FXMLLoader(SerialApplication.class.getResource("/fxml/main-view.fxml"));
