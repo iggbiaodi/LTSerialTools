@@ -24,6 +24,7 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -88,9 +89,19 @@ public class SerialReadService extends Service<LogText> {
     private Consumer<String> onDataReceived;
 
     /**
+     * 原始字节接收回调（用于协议解析、波形绘制等）
+     */
+    private Consumer<byte[]> onRawBytesReceived;
+
+    /**
      * 是否启用内部文本追加（默认启用，可通过设置false由外部管理）
      */
     private boolean internalAppendEnabled = true;
+
+    /**
+     * 是否启用文本解码与分行逻辑。
+     */
+    private boolean decodeTextEnabled = true;
 
     public SerialReadService(SerialPort comPort,
                              PromptInlineCssTextArea targetTextArea,
@@ -201,6 +212,12 @@ public class SerialReadService extends Service<LogText> {
                         if (onRecvBytesChanged != null) {
                             onRecvBytesChanged.accept(totalBytes);
                         }
+                        if (onRawBytesReceived != null) {
+                            onRawBytesReceived.accept(Arrays.copyOf(rawBuf, n));
+                        }
+                        if (!decodeTextEnabled) {
+                            continue;
+                        }
 
                         boolean hexMode = hexDisplayProperty.get();
                         if (hexMode) {
@@ -231,7 +248,7 @@ public class SerialReadService extends Service<LogText> {
                     }
 
                     // 收尾：文本模式下 flush 解码器内部状态，避免尾部字符丢失
-                    if (!previousHexDisplay) {
+                    if (decodeTextEnabled && !previousHexDisplay) {
                         flushTextTail(decoder, byteBuf, charBuf, lineBuf, lineEmitter);
                     }
                 } catch (CharacterCodingException e) {
@@ -418,10 +435,24 @@ public class SerialReadService extends Service<LogText> {
     }
 
     /**
+     * 设置原始字节接收回调
+     */
+    public void setOnRawBytesReceived(Consumer<byte[]> callback) {
+        this.onRawBytesReceived = callback;
+    }
+
+    /**
      * 设置是否启用内部文本追加
      */
     public void setInternalAppendEnabled(boolean enabled) {
         this.internalAppendEnabled = enabled;
+    }
+
+    /**
+     * 设置是否启用文本解码。
+     */
+    public void setDecodeTextEnabled(boolean enabled) {
+        this.decodeTextEnabled = enabled;
     }
 
     /**
@@ -449,5 +480,3 @@ public class SerialReadService extends Service<LogText> {
         return new LogText(ts, raw, LogType.RECEIVE);
     }
 }
-
-

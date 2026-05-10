@@ -12,6 +12,7 @@ import indi.lt.serialtool.utils.UIUtil;
 import indi.lt.serialtool.view.AsciiStage;
 import indi.lt.serialtool.view.SerialReceivePane;
 import indi.lt.serialtool.view.SerialSendPane;
+import indi.lt.serialtool.view.WaveformPane;
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
@@ -95,6 +96,7 @@ public class MainController implements Initializable {
     private BorderPane rootPane;
 
     private final SerialSendPane serialSendPane = SerialSendPane.getInstance();
+    private final WaveformPane waveformPane = new WaveformPane();
 
     private final SplitPane spReceive = new SplitPane();
 
@@ -131,7 +133,10 @@ public class MainController implements Initializable {
 
         Tab tabSend = new Tab("发送模式", serialSendPane);
         tabSend.setClosable(false);
-        tabRootPane.getTabs().addAll(tabSend, tabRec);
+
+        Tab tabWaveform = new Tab("波形图模式", waveformPane);
+        tabWaveform.setClosable(false);
+        tabRootPane.getTabs().addAll(tabSend, tabRec, tabWaveform);
         tabRootPane.getSelectionModel().select(tabRec);
     }
 
@@ -632,9 +637,10 @@ public class MainController implements Initializable {
     @FXML
     public void addNewTab(ActionEvent actionEvent) {
         ObservableList<Tab> tabs = tabRootPane.getTabs();
-        SerialReceivePane serialReceivePane = new SerialReceivePane("串口接收" + tabs.size(), "serialKey" + tabs.size());
+        int index = receivePanes.size() + 1;
+        SerialReceivePane serialReceivePane = new SerialReceivePane("串口接收" + index, "serialKey" + index);
         receivePanes.add(serialReceivePane);
-        Tab tab = new Tab("串口接收" + tabs.size());
+        Tab tab = new Tab("串口接收" + index);
         tab.setContent(serialReceivePane);
         tabs.add(tab);
         tabRootPane.getSelectionModel().select(tab);
@@ -643,6 +649,7 @@ public class MainController implements Initializable {
     public void persistFormStateToConfig() {
         ConfigManager.put(KEY_AUTO_SAVE, String.valueOf(autoSaveCheck.isSelected()));
         serialSendPane.getController().persistFormStateToConfig();
+        waveformPane.persistFormStateToConfig();
         for (SerialReceivePane pane : receivePanes) {
             pane.getController().persistFormStateToConfig();
         }
