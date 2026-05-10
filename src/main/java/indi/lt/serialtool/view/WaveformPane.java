@@ -18,10 +18,12 @@ import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.DialogPane;
@@ -42,6 +44,7 @@ import org.apache.logging.log4j.Logger;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -69,6 +72,16 @@ public class WaveformPane extends BorderPane {
     private static final double MAX_X_ZOOM_FACTOR = 20.0;
     private static final double MIN_Y_ZOOM_FACTOR = 0.1;
     private static final double MAX_Y_ZOOM_FACTOR = 20.0;
+    private static final String[] SERIES_COLORS = {
+            "#f3622d",
+            "#fba71b",
+            "#57b757",
+            "#41a9c9",
+            "#4258c9",
+            "#9a42c8",
+            "#c84164",
+            "#888888"
+    };
 
     private final Label lbSerialName = new Label("串口:");
     private final SerialPortCombBox cbSerialList = new SerialPortCombBox();
@@ -88,6 +101,7 @@ public class WaveformPane extends BorderPane {
     private final Label lbRecvBytes = new Label("0 B");
     private final Label lbFrameInfo = new Label("等待数据");
     private final Label lbViewInfo = new Label("显示窗口: 0 点");
+    private final FlowPane legendBox = new FlowPane(12, 8);
 
     private final NumberAxis xAxis = new NumberAxis();
     private final NumberAxis yAxis = new NumberAxis();
@@ -95,6 +109,7 @@ public class WaveformPane extends BorderPane {
     private final ScrollBar sbTimeline = new ScrollBar();
 
     private final List<XYChart.Series<Number, Number>> waveformSeries = new ArrayList<>();
+    private final List<WaveformLegendItem> legendItems = new ArrayList<>();
     private final List<Double> frameTimes = new ArrayList<>();
     private final ConcurrentLinkedQueue<FrameSnapshot> pendingFrames = new ConcurrentLinkedQueue<>();
     private final AtomicBoolean uiRefreshQueued = new AtomicBoolean(false);
@@ -182,12 +197,16 @@ public class WaveformPane extends BorderPane {
 
         lineChart.setAnimated(false);
         lineChart.setCreateSymbols(false);
-        lineChart.setLegendVisible(true);
+        lineChart.setLegendVisible(false);
         lineChart.setHorizontalGridLinesVisible(true);
         lineChart.setVerticalGridLinesVisible(true);
         lineChart.setTitle("实时波形图");
         lineChart.setMinHeight(320);
         lineChart.setFocusTraversable(true);
+
+        legendBox.setPadding(new Insets(8, 0, 0, 0));
+        legendBox.setAlignment(Pos.CENTER_LEFT);
+        legendBox.getChildren().add(new Label("波形图例"));
 
         sbTimeline.setOrientation(Orientation.HORIZONTAL);
         sbTimeline.setMin(0);
@@ -198,7 +217,7 @@ public class WaveformPane extends BorderPane {
         HBox statusBar = new HBox(16, new Label("接收量:"), lbRecvBytes, createSpacer(), lbFrameInfo);
         statusBar.setAlignment(Pos.CENTER_LEFT);
 
-        VBox root = new VBox(10, topRow, waveformConfigBox, viewControlBox, lineChart, sbTimeline, statusBar);
+        VBox root = new VBox(10, topRow, waveformConfigBox, viewControlBox, lineChart, sbTimeline, legendBox, statusBar);
         VBox.setVgrow(lineChart, Priority.ALWAYS);
         setCenter(root);
     }
@@ -389,6 +408,8 @@ public class WaveformPane extends BorderPane {
         runOnFx(() -> {
             lineChart.getData().clear();
             waveformSeries.clear();
+            legendItems.clear();
+            legendBox.getChildren().setAll(new Label("波形图例"));
             lbRecvBytes.setText("0 B");
             lbFrameInfo.setText("等待数据");
             refreshViewport();
@@ -429,6 +450,7 @@ public class WaveformPane extends BorderPane {
             XYChart.Series<Number, Number> series = waveformSeries.get(i);
             series.getData().add(new XYChart.Data<>(snapshot.timeSeconds(), values[i]));
             trimSeries(series);
+            legendItems.get(i).setCurrentValue(values[i]);
         }
         refreshViewport();
 
@@ -448,10 +470,15 @@ public class WaveformPane extends BorderPane {
     private void ensureSeriesCount(int count) {
         int targetCount = Math.min(count, MAX_WAVE_COUNT);
         while (waveformSeries.size() < targetCount) {
+            int channelIndex = waveformSeries.size();
             XYChart.Series<Number, Number> series = new XYChart.Series<>();
-            series.setName("波形" + (waveformSeries.size() + 1));
+            series.setName("波形" + (channelIndex + 1));
             waveformSeries.add(series);
             lineChart.getData().add(series);
+            WaveformLegendItem legendItem = new WaveformLegendItem(channelIndex, series);
+            legendItems.add(legendItem);
+            legendBox.getChildren().add(legendItem.container());
+            bindSeriesVisibility(series, legendItem);
         }
     }
 
@@ -504,6 +531,8 @@ public class WaveformPane extends BorderPane {
             frameTimes.clear();
             lineChart.getData().clear();
             waveformSeries.clear();
+            legendItems.clear();
+            legendBox.getChildren().setAll(new Label("波形图例"));
             resetViewState();
             refreshViewport();
             lbFrameInfo.setText("波形已清空");
@@ -684,6 +713,10 @@ public class WaveformPane extends BorderPane {
         double max = Double.NEGATIVE_INFINITY;
 
         for (XYChart.Series<Number, Number> series : waveformSeries) {
+            int seriesIndex = waveformSeries.indexOf(series);
+            if (seriesIndex >= 0 && seriesIndex < legendItems.size() && !legendItems.get(seriesIndex).isVisible()) {
+                continue;
+            }
             List<XYChart.Data<Number, Number>> data = series.getData();
             for (int i = data.size() - 1; i >= 0; i--) {
                 XYChart.Data<Number, Number> point = data.get(i);
@@ -753,6 +786,41 @@ public class WaveformPane extends BorderPane {
         return String.format("%.2f", 1.0 / factor) + "x";
     }
 
+    private void bindSeriesVisibility(XYChart.Series<Number, Number> series, WaveformLegendItem legendItem) {
+        series.nodeProperty().addListener((obs, oldNode, newNode) -> applySeriesVisibility(series, legendItem));
+        applySeriesVisibility(series, legendItem);
+    }
+
+    private void applySeriesVisibility(XYChart.Series<Number, Number> series, WaveformLegendItem legendItem) {
+        boolean visible = legendItem.isVisible();
+        Node seriesNode = series.getNode();
+        if (seriesNode != null) {
+            seriesNode.setVisible(visible);
+            seriesNode.setManaged(visible);
+        }
+        for (XYChart.Data<Number, Number> data : series.getData()) {
+            Node dataNode = data.getNode();
+            if (dataNode != null) {
+                dataNode.setVisible(visible);
+                dataNode.setManaged(visible);
+            }
+        }
+    }
+
+    private String formatWaveValue(double value) {
+        if (Math.abs(value) >= 1_000_000 || (Math.abs(value) > 0 && Math.abs(value) < 0.001)) {
+            return String.format(Locale.ROOT, "%.3e", value);
+        }
+        if (Math.rint(value) == value) {
+            return String.format(Locale.ROOT, "%.0f", value);
+        }
+        return String.format(Locale.ROOT, "%.3f", value);
+    }
+
+    private String getSeriesColor(int channelIndex) {
+        return SERIES_COLORS[channelIndex % SERIES_COLORS.length];
+    }
+
     private static int clampInt(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
     }
@@ -783,5 +851,44 @@ public class WaveformPane extends BorderPane {
     }
 
     private record FrameSnapshot(double timeSeconds, WaveformProtocolParser.FrameData frameData) {
+    }
+
+    private final class WaveformLegendItem {
+        private final HBox container;
+        private final CheckBox checkBox;
+        private final Label valueLabel;
+        private final XYChart.Series<Number, Number> series;
+
+        private WaveformLegendItem(int channelIndex, XYChart.Series<Number, Number> series) {
+            this.series = series;
+            Region colorSwatch = new Region();
+            colorSwatch.setPrefSize(18, 8);
+            colorSwatch.setMinSize(18, 8);
+            colorSwatch.setStyle("-fx-background-color: " + getSeriesColor(channelIndex) + "; -fx-background-radius: 2;");
+            this.checkBox = new CheckBox("波形" + (channelIndex + 1));
+            this.checkBox.setSelected(true);
+            this.valueLabel = new Label("--");
+            Label prefixLabel = new Label("当前值:");
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            this.container = new HBox(8, colorSwatch, checkBox, spacer, prefixLabel, valueLabel);
+            this.container.setAlignment(Pos.CENTER_LEFT);
+            this.checkBox.selectedProperty().addListener((obs, oldVal, selected) -> {
+                applySeriesVisibility(this.series, this);
+                refreshViewport();
+            });
+        }
+
+        private HBox container() {
+            return container;
+        }
+
+        private boolean isVisible() {
+            return checkBox.isSelected();
+        }
+
+        private void setCurrentValue(double value) {
+            valueLabel.setText(formatWaveValue(value));
+        }
     }
 }
