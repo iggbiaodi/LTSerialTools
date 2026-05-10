@@ -1,6 +1,7 @@
 package indi.lt.serialtool.view;
 
 import github.nonoas.jfx.flat.ui.stage.AppStage;
+import indi.lt.serialtool.global.FontSettingsManager;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
 
@@ -20,7 +21,18 @@ public class BaseStage extends AppStage {
         setTitle(TITLE);
         Stage stage = getStage(); // 如果没有 getStage()，请改为直接使用父类暴露的 stage 字段
         if (stage != null && stage.getScene() != null) {
-            stage.getScene().getStylesheets().addAll("css/style.css");
+            String stylesheet = FontSettingsManager.getAppStylesheetUrl();
+            if (stylesheet != null && !stage.getScene().getStylesheets().contains(stylesheet)) {
+                stage.getScene().getStylesheets().add(stylesheet);
+            }
+            stage.getScene().rootProperty().addListener((obs, oldRoot, newRoot) -> {
+                if (newRoot != null) {
+                    FontSettingsManager.applyTo(newRoot);
+                }
+            });
+            if (stage.getScene().getRoot() != null) {
+                FontSettingsManager.applyTo(stage.getScene().getRoot());
+            }
         }
         addIcons(Collections.singleton(new Image("image/logo.png")));
     }

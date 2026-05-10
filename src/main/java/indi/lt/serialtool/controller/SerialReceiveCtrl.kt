@@ -5,6 +5,7 @@ import indi.lt.serialtool.component.*
 import indi.lt.serialtool.data.CircularByteBuffer
 import indi.lt.serialtool.data.SerialPortSettings
 import indi.lt.serialtool.global.ConfigManager
+import indi.lt.serialtool.global.FontSettingsManager
 import indi.lt.serialtool.service.AutoSaveService
 import indi.lt.serialtool.service.SerialReadService
 import indi.lt.serialtool.utils.UIUtil
@@ -188,6 +189,7 @@ class SerialReceiveCtrl : Initializable {
             dialog.dialogPane = dialogPane
             dialog.title = "串口参数设置"
             dialog.headerText = "自定义串口参数"
+            FontSettingsManager.configureDialog(dialog)
 
             // 注意：FXML 中已经定义了按钮，不需要再次添加
 

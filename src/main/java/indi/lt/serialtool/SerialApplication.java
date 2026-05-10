@@ -8,6 +8,7 @@ import indi.lt.serialtool.component.CommandTableView;
 import indi.lt.serialtool.controller.MainController;
 import indi.lt.serialtool.data.CommandRepository;
 import indi.lt.serialtool.global.ConfigManager;
+import indi.lt.serialtool.global.FontSettingsManager;
 import indi.lt.serialtool.view.MainStage;
 import indi.lt.serialtool.view.SaveProgressStage;
 import javafx.application.Platform;
@@ -128,6 +129,7 @@ public class SerialApplication extends AutoReleaseApplication {
             alert.setTitle("保存失败");
             alert.setHeaderText("关闭前保存配置失败");
             alert.setContentText(saveTask.getException() == null ? "请重试关闭窗口。" : saveTask.getException().getMessage());
+            FontSettingsManager.configureDialog(alert);
             alert.showAndWait();
         });
 

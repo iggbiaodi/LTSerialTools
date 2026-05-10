@@ -4,6 +4,7 @@ import github.nonoas.jfx.flat.ui.theme.Theme;
 import indi.lt.serialtool.SerialApplication;
 import indi.lt.serialtool.component.CommandTableView;
 import indi.lt.serialtool.global.ConfigManager;
+import indi.lt.serialtool.global.FontSettingsManager;
 import indi.lt.serialtool.global.ThemeManager;
 import indi.lt.serialtool.service.AutoSaveService;
 import indi.lt.serialtool.utils.ZipUtil;
@@ -21,8 +22,13 @@ import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
+import javafx.scene.text.Font;
 import javafx.stage.FileChooser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -160,6 +166,10 @@ public class MainController implements Initializable {
             radioMenuItem.setToggleGroup(themeGroup);
             mbTheme.getItems().add(radioMenuItem);
         }
+        mbTheme.getItems().add(new SeparatorMenuItem());
+        MenuItem fontSettingsItem = new MenuItem("字体设置");
+        fontSettingsItem.setOnAction(this::showFontSettingsDialog);
+        mbTheme.getItems().add(fontSettingsItem);
 
         // 监听选项变化
         themeGroup.selectedToggleProperty().addListener((obs, oldVal, newVal) -> {
@@ -197,6 +207,7 @@ public class MainController implements Initializable {
         dialog.setTitle("设置接收超时时间");
         dialog.setHeaderText("单位：ms。超过该时间未收到回车换行，会输出当前缓存数据。\n修改后新开启的接收串口生效。");
         dialog.setContentText("超时时间(ms):");
+        FontSettingsManager.configureDialog(dialog);
 
         dialog.showAndWait().ifPresent(input -> {
             String value = input == null ? "" : input.trim();
@@ -215,6 +226,7 @@ public class MainController implements Initializable {
                 alert.setTitle("参数错误");
                 alert.setHeaderText("接收超时时间必须是正整数");
                 alert.setContentText("示例: 500 (单位 ms)");
+                FontSettingsManager.configureDialog(alert);
                 alert.showAndWait();
             }
         });
@@ -246,6 +258,7 @@ public class MainController implements Initializable {
         dialog.setTitle("设置自动保存间隔时间");
         dialog.setHeaderText("单位：秒。自动保存将按照此间隔触发。");
         dialog.setContentText("间隔时间(秒):");
+        FontSettingsManager.configureDialog(dialog);
 
         dialog.showAndWait().ifPresent(input -> {
             String value = input.trim();
@@ -265,6 +278,7 @@ public class MainController implements Initializable {
                 alert.setTitle("参数错误");
                 alert.setHeaderText("间隔时间必须是大于0的整数");
                 alert.setContentText("示例: 5 (单位 秒)");
+                FontSettingsManager.configureDialog(alert);
                 alert.showAndWait();
             }
         });
@@ -305,6 +319,7 @@ public class MainController implements Initializable {
         content.setPadding(new javafx.geometry.Insets(10));
 
         dialog.getDialogPane().setContent(content);
+        FontSettingsManager.configureDialog(dialog);
 
         // 结果转换器
         dialog.setResultConverter(buttonType -> {
@@ -329,6 +344,7 @@ public class MainController implements Initializable {
                 alert.setTitle("参数错误");
                 alert.setHeaderText("文件大小必须是大于0的整数");
                 alert.setContentText("示例: 10 (单位 MB)");
+                FontSettingsManager.configureDialog(alert);
                 alert.showAndWait();
             }
         });
@@ -374,6 +390,7 @@ public class MainController implements Initializable {
         content.setPadding(new javafx.geometry.Insets(10));
 
         dialog.getDialogPane().setContent(content);
+        FontSettingsManager.configureDialog(dialog);
 
         // 结果转换器
         dialog.setResultConverter(buttonType -> {
@@ -405,6 +422,7 @@ public class MainController implements Initializable {
                 alert.setTitle("参数错误");
                 alert.setHeaderText("容量必须是大于0的整数");
                 alert.setContentText("示例: 10 (单位 MB)");
+                FontSettingsManager.configureDialog(alert);
                 alert.showAndWait();
             }
         });
@@ -475,6 +493,7 @@ public class MainController implements Initializable {
         sizeDialog.setTitle("设置分卷大小");
         sizeDialog.setHeaderText("选择每个分卷文件的大小");
         sizeDialog.setContentText("分卷大小:");
+        FontSettingsManager.configureDialog(sizeDialog);
 
         sizeDialog.showAndWait().ifPresent(sizeStr -> {
             try {
@@ -494,6 +513,94 @@ public class MainController implements Initializable {
                 UIUtil.showToast("保存失败: " + e.getMessage());
             }
         });
+    }
+
+    private void showFontSettingsDialog(ActionEvent actionEvent) {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("字体设置");
+        dialog.setHeaderText("设置界面字体和文本框字体");
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+        ComboBox<String> uiFontBox = createFontFamilyBox(FontSettingsManager.getUiFontFamily());
+        ComboBox<String> textFontBox = createFontFamilyBox(FontSettingsManager.getTextFontFamily());
+        Label uiLabel = new Label("界面字体:");
+        Label textLabel = new Label("文本框字体:");
+
+        GridPane content = new GridPane();
+        content.setHgap(12);
+        content.setVgap(12);
+        content.setPadding(new javafx.geometry.Insets(10));
+
+        ColumnConstraints labelColumn = new ColumnConstraints();
+        labelColumn.setMinWidth(Region.USE_PREF_SIZE);
+        ColumnConstraints inputColumn = new ColumnConstraints();
+        inputColumn.setHgrow(Priority.ALWAYS);
+        inputColumn.setFillWidth(true);
+        content.getColumnConstraints().addAll(labelColumn, inputColumn);
+
+        content.add(uiLabel, 0, 0);
+        content.add(uiFontBox, 1, 0);
+        content.add(textLabel, 0, 1);
+        content.add(textFontBox, 1, 1);
+        GridPane.setHgrow(uiFontBox, Priority.ALWAYS);
+        GridPane.setHgrow(textFontBox, Priority.ALWAYS);
+        GridPane.setFillWidth(uiFontBox, true);
+        GridPane.setFillWidth(textFontBox, true);
+
+        uiFontBox.prefWidthProperty().bind(content.widthProperty()
+                .subtract(uiLabel.widthProperty())
+                .subtract(40));
+        textFontBox.prefWidthProperty().bind(content.widthProperty()
+                .subtract(textLabel.widthProperty())
+                .subtract(40));
+
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().setMinWidth(420);
+        FontSettingsManager.configureDialog(dialog);
+
+        dialog.showAndWait().ifPresent(buttonType -> {
+            if (buttonType != ButtonType.OK) {
+                return;
+            }
+            FontSettingsManager.saveFontFamilies(uiFontBox.getValue(), textFontBox.getValue());
+            FontSettingsManager.applyToOpenWindows();
+            UIUtil.showToast("字体设置已保存");
+        });
+    }
+
+    private ComboBox<String> createFontFamilyBox(String selectedFont) {
+        ComboBox<String> fontBox = new ComboBox<>();
+        fontBox.getItems().addAll(FontSettingsManager.getAvailableFontFamilies());
+        fontBox.setValue(selectedFont);
+        fontBox.setMaxWidth(Double.MAX_VALUE);
+        fontBox.setVisibleRowCount(12);
+        fontBox.setCellFactory(listView -> new ListCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setFont(Font.getDefault());
+                    return;
+                }
+                setText(item);
+                setFont(Font.font(item, 13));
+            }
+        });
+        fontBox.setButtonCell(new ListCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setFont(Font.getDefault());
+                    return;
+                }
+                setText(item);
+                setFont(Font.font(item, 13));
+            }
+        });
+        return fontBox;
     }
 
     public String getDividePosition() {

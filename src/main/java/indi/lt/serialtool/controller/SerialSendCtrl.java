@@ -15,6 +15,7 @@ import indi.lt.serialtool.data.CommandRepository;
 import indi.lt.serialtool.data.LogText;
 import indi.lt.serialtool.data.SerialPortSettings;
 import indi.lt.serialtool.global.ConfigManager;
+import indi.lt.serialtool.global.FontSettingsManager;
 import indi.lt.serialtool.service.SerialReadService;
 import indi.lt.serialtool.service.SerialSenderService;
 import indi.lt.serialtool.utils.StringUtil;
@@ -333,6 +334,7 @@ public class SerialSendCtrl implements Initializable {
             dialog.setDialogPane(dialogPane);
             dialog.setTitle("串口参数设置");
             dialog.setHeaderText("自定义串口参数");
+            FontSettingsManager.configureDialog(dialog);
 
             // 注意：FXML 中已经定义了按钮，不需要再次添加
 

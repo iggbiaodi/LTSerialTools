@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class PromptInlineCssTextArea extends StackPane {
+    private static final String FONT_STYLE_KEY = "app.font.promptAreaStyle";
 
     private final InlineCssTextArea area = new InlineCssTextArea();
     private final VirtualizedScrollPane<InlineCssTextArea> vsPane;
@@ -242,5 +243,42 @@ public class PromptInlineCssTextArea extends StackPane {
 
     public void setAutoScroll(boolean autoScroll) {
         this.autoScroll.set(autoScroll);
+    }
+
+    public void applyTextFontFamily(String fontFamily) {
+        String fontStyle = "-fx-font-family: '" + escapeFontFamily(fontFamily) + "';";
+        applyManagedStyle(this, fontStyle);
+        applyManagedStyle(area, fontStyle);
+    }
+
+    public void clearTextFontFamily() {
+        clearManagedStyle(this);
+        clearManagedStyle(area);
+    }
+
+    private void applyManagedStyle(Node node, String managedStyle) {
+        String previousStyle = (String) node.getProperties().get(FONT_STYLE_KEY);
+        String currentStyle = node.getStyle();
+        String baseStyle = currentStyle == null ? "" : currentStyle;
+        if (previousStyle != null && !previousStyle.isEmpty()) {
+            baseStyle = baseStyle.replace(previousStyle, "").trim();
+        }
+        node.setStyle(baseStyle.isEmpty() ? managedStyle : (baseStyle + " " + managedStyle).trim());
+        node.getProperties().put(FONT_STYLE_KEY, managedStyle);
+    }
+
+    private void clearManagedStyle(Node node) {
+        String previousStyle = (String) node.getProperties().get(FONT_STYLE_KEY);
+        if (previousStyle == null || previousStyle.isEmpty()) {
+            return;
+        }
+        String currentStyle = node.getStyle();
+        String baseStyle = currentStyle == null ? "" : currentStyle.replace(previousStyle, "").trim();
+        node.setStyle(baseStyle);
+        node.getProperties().remove(FONT_STYLE_KEY);
+    }
+
+    private String escapeFontFamily(String fontFamily) {
+        return fontFamily == null ? "" : fontFamily.replace("\\", "\\\\").replace("'", "\\'");
     }
 }
