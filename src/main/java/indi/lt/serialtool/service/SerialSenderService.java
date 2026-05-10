@@ -47,7 +47,7 @@ public class SerialSenderService extends Service<LogText> {
 
         valueProperty().addListener((observableValue, unused, newVal) -> {
             if (null != newVal) {
-                taRecvArea.appendText(newVal.getLogText(cbTimeStampDisplay.isSelected(), true));
+                taRecvArea.appendText(newVal.getLogText(cbTimeStampDisplay.isSelected(), true) + "\r\n");
             }
         });
     }
