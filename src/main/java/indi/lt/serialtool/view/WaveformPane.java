@@ -1,6 +1,7 @@
 package indi.lt.serialtool.view;
 
 import com.fazecast.jSerialComm.SerialPort;
+import github.nonoas.jfx.flat.ui.pane.JustifiedFlowPane;
 import indi.lt.serialtool.component.PromptInlineCssTextArea;
 import indi.lt.serialtool.component.SerialPortCombBox;
 import indi.lt.serialtool.component.SerialToggleButton;
@@ -28,9 +29,11 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ScrollBar;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.SpinnerValueFactory;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -101,7 +104,7 @@ public class WaveformPane extends BorderPane {
     private final Label lbRecvBytes = new Label("0 B");
     private final Label lbFrameInfo = new Label("等待数据");
     private final Label lbViewInfo = new Label("显示窗口: 0 点");
-    private final FlowPane legendBox = new FlowPane(12, 8);
+    private final JustifiedFlowPane legendBox = new JustifiedFlowPane(20, 10, 160);
 
     private final NumberAxis xAxis = new NumberAxis();
     private final NumberAxis yAxis = new NumberAxis();
@@ -142,6 +145,9 @@ public class WaveformPane extends BorderPane {
 
         btnOpenSerial.setSelectedText("关闭");
         btnOpenSerial.setUnSelectedText("打开");
+        btnOpenSerial.setText("打开");
+        btnOpenSerial.setPrefWidth(USE_COMPUTED_SIZE);
+
         cbSerialList.setMinWidth(220);
         cbBaudRateList.setEditable(true);
         cbBaudRateList.setMinWidth(140);
@@ -205,8 +211,6 @@ public class WaveformPane extends BorderPane {
         lineChart.setFocusTraversable(true);
 
         legendBox.setPadding(new Insets(8, 0, 0, 0));
-        legendBox.setAlignment(Pos.CENTER_LEFT);
-        legendBox.getChildren().add(new Label("波形图例"));
 
         sbTimeline.setOrientation(Orientation.HORIZONTAL);
         sbTimeline.setMin(0);
@@ -409,7 +413,6 @@ public class WaveformPane extends BorderPane {
             lineChart.getData().clear();
             waveformSeries.clear();
             legendItems.clear();
-            legendBox.getChildren().setAll(new Label("波形图例"));
             lbRecvBytes.setText("0 B");
             lbFrameInfo.setText("等待数据");
             refreshViewport();
@@ -532,7 +535,6 @@ public class WaveformPane extends BorderPane {
             lineChart.getData().clear();
             waveformSeries.clear();
             legendItems.clear();
-            legendBox.getChildren().setAll(new Label("波形图例"));
             resetViewState();
             refreshViewport();
             lbFrameInfo.setText("波形已清空");
@@ -856,23 +858,40 @@ public class WaveformPane extends BorderPane {
     private final class WaveformLegendItem {
         private final HBox container;
         private final CheckBox checkBox;
-        private final Label valueLabel;
+        private final TextField valueTextField;
         private final XYChart.Series<Number, Number> series;
 
         private WaveformLegendItem(int channelIndex, XYChart.Series<Number, Number> series) {
             this.series = series;
             Region colorSwatch = new Region();
-            colorSwatch.setPrefSize(18, 8);
-            colorSwatch.setMinSize(18, 8);
-            colorSwatch.setStyle("-fx-background-color: " + getSeriesColor(channelIndex) + "; -fx-background-radius: 2;");
+            colorSwatch.setPrefSize(12, 12);
+            colorSwatch.setMinSize(12, 12);
+            colorSwatch.setStyle("-fx-background-color: " + getSeriesColor(channelIndex) + "; -fx-background-radius: 999;");
+
             this.checkBox = new CheckBox("波形" + (channelIndex + 1));
             this.checkBox.setSelected(true);
-            this.valueLabel = new Label("--");
-            Label prefixLabel = new Label("当前值:");
-            Region spacer = new Region();
-            HBox.setHgrow(spacer, Priority.ALWAYS);
-            this.container = new HBox(8, colorSwatch, checkBox, spacer, prefixLabel, valueLabel);
+            this.checkBox.setGraphic(colorSwatch);
+
+            // 防止 CheckBox 文本被压缩
+            checkBox.setMinWidth(Region.USE_PREF_SIZE);
+            checkBox.setPrefWidth(Region.USE_COMPUTED_SIZE);
+            checkBox.setMaxWidth(Region.USE_PREF_SIZE);
+
+            // 可选：避免文字省略成 ...
+            checkBox.setTextOverrun(OverrunStyle.CLIP);
+            // 或者更常用：
+            // checkBox.setTextOverrun(OverrunStyle.ELLIPSIS);
+
+            valueTextField = new TextField();
+            valueTextField.setEditable(false);
+
+            // 让 TextField 承担压缩/扩展
+            HBox.setHgrow(valueTextField, Priority.ALWAYS);
+            valueTextField.setMinWidth(0);
+
+            this.container = new HBox(4, checkBox, valueTextField);
             this.container.setAlignment(Pos.CENTER_LEFT);
+
             this.checkBox.selectedProperty().addListener((obs, oldVal, selected) -> {
                 applySeriesVisibility(this.series, this);
                 refreshViewport();
@@ -888,7 +907,7 @@ public class WaveformPane extends BorderPane {
         }
 
         private void setCurrentValue(double value) {
-            valueLabel.setText(formatWaveValue(value));
+            valueTextField.setText(formatWaveValue(value));
         }
     }
 }
