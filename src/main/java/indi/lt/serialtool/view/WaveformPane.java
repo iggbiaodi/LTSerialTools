@@ -75,6 +75,7 @@ public class WaveformPane extends BorderPane {
     private static final double MAX_X_ZOOM_FACTOR = 20.0;
     private static final double MIN_Y_ZOOM_FACTOR = 0.1;
     private static final double MAX_Y_ZOOM_FACTOR = 20.0;
+    private static final double WAVEFORM_STROKE_WIDTH = 1.2;
     private static final String[] SERIES_COLORS = {
             "#f3622d",
             "#fba71b",
@@ -789,7 +790,11 @@ public class WaveformPane extends BorderPane {
     }
 
     private void bindSeriesVisibility(XYChart.Series<Number, Number> series, WaveformLegendItem legendItem) {
-        series.nodeProperty().addListener((obs, oldNode, newNode) -> applySeriesVisibility(series, legendItem));
+        series.nodeProperty().addListener((obs, oldNode, newNode) -> {
+            applySeriesLineStyle(series);
+            applySeriesVisibility(series, legendItem);
+        });
+        applySeriesLineStyle(series);
         applySeriesVisibility(series, legendItem);
     }
 
@@ -807,6 +812,19 @@ public class WaveformPane extends BorderPane {
                 dataNode.setManaged(visible);
             }
         }
+    }
+
+    private void applySeriesLineStyle(XYChart.Series<Number, Number> series) {
+        Node seriesNode = series.getNode();
+        if (seriesNode == null) {
+            return;
+        }
+        Node lineNode = seriesNode.lookup(".chart-series-line");
+        if (lineNode == null) {
+            Platform.runLater(() -> applySeriesLineStyle(series));
+            return;
+        }
+        lineNode.setStyle("-fx-stroke-width: " + WAVEFORM_STROKE_WIDTH + "px;");
     }
 
     private String formatWaveValue(double value) {

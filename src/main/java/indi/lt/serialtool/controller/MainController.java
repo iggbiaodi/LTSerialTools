@@ -60,10 +60,9 @@ import static org.kordamp.ikonli.material2.Material2OutlinedMZ.TUNE;
 
 public class MainController implements Initializable {
     private static final String KEY_AUTO_SAVE = "main.form.autoSave";
+    private static final String DEFAULT_THEME_NAME = "PrimerLight";
 
     private final Logger LOG = LogManager.getLogger(MainController.class);
-
-    public MenuButton mbTheme;
 
     @FXML
     public ToolBar toolBar;
@@ -72,6 +71,9 @@ public class MainController implements Initializable {
 
     @FXML
     public MenuButton mbSetting;
+
+    @FXML
+    public MenuButton mbAppearance;
 
     public CheckMenuItem autoSaveCheck;
 
@@ -106,7 +108,7 @@ public class MainController implements Initializable {
     @FXML
     private TabPane tabRootPane;
 
-    private ToggleGroup themeGroup;
+    private Theme currentTheme;
     private final List<SerialReceivePane> receivePanes = new ArrayList<>();
 
 
@@ -150,7 +152,7 @@ public class MainController implements Initializable {
         mbNewTab.setGraphic(new FontIcon(ADD_BOX));
         mbFile.setGraphic(new FontIcon(ASSIGNMENT));
         mbSetting.setGraphic(new FontIcon(SETTINGS));
-        mbTheme.setGraphic(new FontIcon(INVERT_COLORS));
+        mbAppearance.setGraphic(new FontIcon(INVERT_COLORS));
         mbTools.setGraphic(new FontIcon(TUNE));
         mbHelp.setGraphic(new FontIcon(INFO));
 
@@ -162,27 +164,7 @@ public class MainController implements Initializable {
         region.setMinHeight(10);
         toolBar.getItems().add(0, logoView);
         toolBar.getItems().add(1, region);
-
-        // 创建 ToggleGroup
-        ToggleGroup themeGroup = new ToggleGroup();
-        for (Theme theme : ThemeManager.getAll()) {
-            RadioMenuItem radioMenuItem = new RadioMenuItem(theme.getName());
-            radioMenuItem.setUserData(theme);
-            radioMenuItem.setToggleGroup(themeGroup);
-            mbTheme.getItems().add(radioMenuItem);
-        }
-        mbTheme.getItems().add(new SeparatorMenuItem());
-        MenuItem fontSettingsItem = new MenuItem("字体设置");
-        fontSettingsItem.setOnAction(this::showFontSettingsDialog);
-        mbTheme.getItems().add(fontSettingsItem);
-
-        // 监听选项变化
-        themeGroup.selectedToggleProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null) {
-                Theme theme = (Theme) newVal.getUserData();
-                SerialApplication.setUserAgentStylesheet(theme.getUserAgentStylesheet());
-            }
-        });
+        currentTheme = resolveDefaultTheme();
 
         autoSaveCheck.setSelected(AutoSaveService.isAutoSaveEnabled());
         autoSaveCheck.selectedProperty().addListener((obs, oldVal, newVal) -> {
@@ -520,14 +502,17 @@ public class MainController implements Initializable {
         });
     }
 
-    private void showFontSettingsDialog(ActionEvent actionEvent) {
+    @FXML
+    private void showAppearanceSettingsDialog(ActionEvent actionEvent) {
         Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("字体设置");
-        dialog.setHeaderText("设置界面字体和文本框字体");
+        dialog.setTitle("外观设置");
+        dialog.setHeaderText("设置主题、界面字体和文本框字体");
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
 
+        ComboBox<Theme> themeBox = createThemeBox(currentTheme);
         ComboBox<String> uiFontBox = createFontFamilyBox(FontSettingsManager.getUiFontFamily());
         ComboBox<String> textFontBox = createFontFamilyBox(FontSettingsManager.getTextFontFamily());
+        Label themeLabel = new Label("主题:");
         Label uiLabel = new Label("界面字体:");
         Label textLabel = new Label("文本框字体:");
 
@@ -543,15 +528,22 @@ public class MainController implements Initializable {
         inputColumn.setFillWidth(true);
         content.getColumnConstraints().addAll(labelColumn, inputColumn);
 
-        content.add(uiLabel, 0, 0);
-        content.add(uiFontBox, 1, 0);
-        content.add(textLabel, 0, 1);
-        content.add(textFontBox, 1, 1);
+        content.add(themeLabel, 0, 0);
+        content.add(themeBox, 1, 0);
+        content.add(uiLabel, 0, 1);
+        content.add(uiFontBox, 1, 1);
+        content.add(textLabel, 0, 2);
+        content.add(textFontBox, 1, 2);
+        GridPane.setHgrow(themeBox, Priority.ALWAYS);
+        GridPane.setFillWidth(themeBox, true);
         GridPane.setHgrow(uiFontBox, Priority.ALWAYS);
         GridPane.setHgrow(textFontBox, Priority.ALWAYS);
         GridPane.setFillWidth(uiFontBox, true);
         GridPane.setFillWidth(textFontBox, true);
 
+        themeBox.prefWidthProperty().bind(content.widthProperty()
+                .subtract(themeLabel.widthProperty())
+                .subtract(40));
         uiFontBox.prefWidthProperty().bind(content.widthProperty()
                 .subtract(uiLabel.widthProperty())
                 .subtract(40));
@@ -567,10 +559,34 @@ public class MainController implements Initializable {
             if (buttonType != ButtonType.OK) {
                 return;
             }
+            applyTheme(themeBox.getValue());
             FontSettingsManager.saveFontFamilies(uiFontBox.getValue(), textFontBox.getValue());
             FontSettingsManager.applyToOpenWindows();
-            UIUtil.showToast("字体设置已保存");
+            UIUtil.showToast("外观设置已保存");
         });
+    }
+
+    private ComboBox<Theme> createThemeBox(Theme selectedTheme) {
+        ComboBox<Theme> themeBox = new ComboBox<>();
+        themeBox.getItems().addAll(ThemeManager.getAll());
+        themeBox.setValue(selectedTheme);
+        themeBox.setMaxWidth(Double.MAX_VALUE);
+        themeBox.setVisibleRowCount(8);
+        themeBox.setCellFactory(listView -> new ListCell<>() {
+            @Override
+            protected void updateItem(Theme item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getName());
+            }
+        });
+        themeBox.setButtonCell(new ListCell<>() {
+            @Override
+            protected void updateItem(Theme item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getName());
+            }
+        });
+        return themeBox;
     }
 
     private ComboBox<String> createFontFamilyBox(String selectedFont) {
@@ -606,6 +622,24 @@ public class MainController implements Initializable {
             }
         });
         return fontBox;
+    }
+
+    private Theme resolveDefaultTheme() {
+        List<Theme> themes = ThemeManager.getAll();
+        for (Theme theme : themes) {
+            if (DEFAULT_THEME_NAME.equals(theme.getName())) {
+                return theme;
+            }
+        }
+        return themes.isEmpty() ? null : themes.get(0);
+    }
+
+    private void applyTheme(Theme theme) {
+        if (theme == null) {
+            return;
+        }
+        currentTheme = theme;
+        SerialApplication.setUserAgentStylesheet(theme.getUserAgentStylesheet());
     }
 
     public String getDividePosition() {

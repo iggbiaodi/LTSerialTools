@@ -42,8 +42,10 @@
                         <MenuItem fx:id="menuReceiveTimeout" mnemonicParsing="false" onAction="#setReceiveTimeout" text="设置接收超时时间"/>
                     </items>
                 </MenuButton>
-                <MenuButton fx:id="mbTheme" mnemonicParsing="false">
-                    <items/>
+                <MenuButton fx:id="mbAppearance" mnemonicParsing="false">
+                    <items>
+                        <MenuItem mnemonicParsing="false" onAction="#showAppearanceSettingsDialog" text="外观设置"/>
+                    </items>
                 </MenuButton>
                 <MenuButton fx:id="mbTools" mnemonicParsing="false">
                     <items>
