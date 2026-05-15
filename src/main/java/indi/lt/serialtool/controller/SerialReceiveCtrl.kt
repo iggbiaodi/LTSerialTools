@@ -465,6 +465,11 @@ class SerialReceiveCtrl : Initializable {
         circularBuffer.setCapacity(capacityBytes)
     }
 
+    fun dispose() {
+        updateAutoSaveService(false)
+        closeSelectSerial()
+    }
+
     /**
      * 获取原始数据
      */

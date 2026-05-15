@@ -560,6 +560,11 @@ public class WaveformPane extends BorderPane {
         runOnFx(() -> lbFrameInfo.setText("串口已关闭"));
     }
 
+    public void dispose() {
+        pendingFrames.clear();
+        closeSelectedSerial();
+    }
+
     private int getReceiveTimeoutMs() {
         String rawTimeout = ConfigManager.get(
                 ConfigManager.KEY_RECEIVE_TIMEOUT_MS,

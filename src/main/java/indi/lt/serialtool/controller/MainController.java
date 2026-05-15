@@ -43,7 +43,9 @@ import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.ResourceBundle;
 import java.util.stream.Collectors;
@@ -101,6 +103,7 @@ public class MainController implements Initializable {
     private final WaveformPane waveformPane = new WaveformPane();
 
     private final SplitPane spReceive = new SplitPane();
+    private final SplitPane splitTabContainer = new SplitPane();
 
     private final ToolBar topToolBar = new ToolBar();
 
@@ -110,6 +113,15 @@ public class MainController implements Initializable {
 
     private Theme currentTheme;
     private final List<SerialReceivePane> receivePanes = new ArrayList<>();
+    private final Map<Tab, Runnable> tabCloseActions = new HashMap<>();
+    private TabPane leftSplitTabPane;
+    private TabPane rightSplitTabPane;
+    private int receivePaneIndex = 2;
+
+    private enum SplitSide {
+        LEFT,
+        RIGHT
+    }
 
 
     public TabPane getMenuBar() {
@@ -119,6 +131,8 @@ public class MainController implements Initializable {
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
         initMenuButtons();
+        tabRootPane.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
+        splitTabContainer.setFocusTraversable(false);
 
         SerialReceivePane serialReceivePane1 = new SerialReceivePane("串口1:", "serialKey1");
         SerialReceivePane serialReceivePane2 = new SerialReceivePane("串口2:", "serialKey2");
@@ -130,16 +144,157 @@ public class MainController implements Initializable {
         double[] dividePositionList = Arrays.stream(dividePostions.split(",")).mapToDouble(Double::parseDouble).toArray();
         Platform.runLater(() -> spReceive.setDividerPositions(dividePositionList));
 
-        Tab tabRec = new Tab("接收模式", spReceive);
-        tabRec.setClosable(false);
+        Tab tabRec = createManagedTab("接收模式", spReceive, () -> {
+            disposeReceivePane(serialReceivePane1);
+            disposeReceivePane(serialReceivePane2);
+        }, false);
 
-        Tab tabSend = new Tab("发送模式", serialSendPane);
-        tabSend.setClosable(false);
+        Tab tabSend = createManagedTab("发送模式", serialSendPane, serialSendPane::dispose, false);
 
-        Tab tabWaveform = new Tab("波形图模式", waveformPane);
-        tabWaveform.setClosable(false);
+        Tab tabWaveform = createManagedTab("波形图模式", waveformPane, waveformPane::dispose, false);
         tabRootPane.getTabs().addAll(tabSend, tabRec, tabWaveform);
         tabRootPane.getSelectionModel().select(tabRec);
+    }
+
+    private Tab createManagedTab(String title, Node content, Runnable closeAction, boolean closable) {
+        Tab tab = new Tab(title, content);
+        tab.setClosable(closable);
+        tab.setContextMenu(createTabContextMenu(tab));
+        tab.setOnClosed(event -> handleTabClosed(tab));
+        if (closeAction != null) {
+            tabCloseActions.put(tab, closeAction);
+        }
+        return tab;
+    }
+
+    private ContextMenu createTabContextMenu(Tab tab) {
+        MenuItem splitLeftItem = new MenuItem("拆分到左侧面板");
+        splitLeftItem.setOnAction(event -> moveTabToSide(tab, SplitSide.LEFT));
+
+        MenuItem splitRightItem = new MenuItem("拆分到右侧面板");
+        splitRightItem.setOnAction(event -> moveTabToSide(tab, SplitSide.RIGHT));
+
+        MenuItem cancelSplitItem = new MenuItem("取消拆分");
+        cancelSplitItem.setOnAction(event -> moveTabToMain(tab));
+
+        ContextMenu contextMenu = new ContextMenu(splitLeftItem, splitRightItem, cancelSplitItem);
+        contextMenu.setOnShowing(event -> {
+            TabPane owner = tab.getTabPane();
+            splitLeftItem.setDisable(owner == null || owner == leftSplitTabPane);
+            splitRightItem.setDisable(owner == null || owner == rightSplitTabPane);
+            cancelSplitItem.setDisable(owner == null || owner == tabRootPane);
+        });
+        return contextMenu;
+    }
+
+    private void handleTabClosed(Tab tab) {
+        Runnable closeAction = tabCloseActions.remove(tab);
+        if (closeAction != null) {
+            closeAction.run();
+        }
+        cleanupEmptySplitTabPanes();
+        refreshSplitLayout();
+    }
+
+    private void moveTabToSide(Tab tab, SplitSide splitSide) {
+        TabPane sourcePane = tab.getTabPane();
+        if (sourcePane == null) {
+            return;
+        }
+
+        TabPane targetPane = ensureSplitTabPane(splitSide);
+        if (sourcePane == targetPane) {
+            return;
+        }
+
+        sourcePane.getTabs().remove(tab);
+        targetPane.getTabs().add(tab);
+        targetPane.getSelectionModel().select(tab);
+
+        cleanupEmptySplitTabPanes();
+        refreshSplitLayout();
+    }
+
+    private void moveTabToMain(Tab tab) {
+        TabPane sourcePane = tab.getTabPane();
+        if (sourcePane == null || sourcePane == tabRootPane) {
+            return;
+        }
+
+        sourcePane.getTabs().remove(tab);
+        tabRootPane.getTabs().add(tab);
+        tabRootPane.getSelectionModel().select(tab);
+
+        cleanupEmptySplitTabPanes();
+        refreshSplitLayout();
+    }
+
+    private TabPane ensureSplitTabPane(SplitSide splitSide) {
+        if (splitSide == SplitSide.LEFT) {
+            if (leftSplitTabPane == null) {
+                leftSplitTabPane = createSplitTabPane();
+            }
+            return leftSplitTabPane;
+        }
+        if (rightSplitTabPane == null) {
+            rightSplitTabPane = createSplitTabPane();
+        }
+        return rightSplitTabPane;
+    }
+
+    private TabPane createSplitTabPane() {
+        TabPane tabPane = new TabPane();
+        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
+        return tabPane;
+    }
+
+    private void cleanupEmptySplitTabPanes() {
+        if (leftSplitTabPane != null && leftSplitTabPane.getTabs().isEmpty()) {
+            leftSplitTabPane = null;
+        }
+        if (rightSplitTabPane != null && rightSplitTabPane.getTabs().isEmpty()) {
+            rightSplitTabPane = null;
+        }
+    }
+
+    private void refreshSplitLayout() {
+        boolean hasLeftPane = leftSplitTabPane != null && !leftSplitTabPane.getTabs().isEmpty();
+        boolean hasRightPane = rightSplitTabPane != null && !rightSplitTabPane.getTabs().isEmpty();
+
+        if (!hasLeftPane && !hasRightPane) {
+            splitTabContainer.getItems().clear();
+            rootPane.setCenter(tabRootPane);
+            return;
+        }
+
+        ObservableList<Node> items = splitTabContainer.getItems();
+        items.clear();
+        if (hasLeftPane) {
+            items.add(leftSplitTabPane);
+        }
+        items.add(tabRootPane);
+        if (hasRightPane) {
+            items.add(rightSplitTabPane);
+        }
+        rootPane.setCenter(splitTabContainer);
+
+        Platform.runLater(() -> {
+            if (hasLeftPane && hasRightPane) {
+                splitTabContainer.setDividerPositions(0.25, 0.75);
+            } else if (hasLeftPane) {
+                splitTabContainer.setDividerPositions(0.3);
+            } else {
+                splitTabContainer.setDividerPositions(0.7);
+            }
+        });
+    }
+
+    private void disposeReceivePane(SerialReceivePane receivePane) {
+        if (receivePane == null) {
+            return;
+        }
+        receivePane.dispose();
+        receivePanes.remove(receivePane);
     }
 
     private void initMenuButtons() {
@@ -671,11 +826,10 @@ public class MainController implements Initializable {
     @FXML
     public void addNewTab(ActionEvent actionEvent) {
         ObservableList<Tab> tabs = tabRootPane.getTabs();
-        int index = receivePanes.size() + 1;
+        int index = ++receivePaneIndex;
         SerialReceivePane serialReceivePane = new SerialReceivePane("串口接收" + index, "serialKey" + index);
         receivePanes.add(serialReceivePane);
-        Tab tab = new Tab("串口接收" + index);
-        tab.setContent(serialReceivePane);
+        Tab tab = createManagedTab("串口接收" + index, serialReceivePane, () -> disposeReceivePane(serialReceivePane), true);
         tabs.add(tab);
         tabRootPane.getSelectionModel().select(tab);
     }

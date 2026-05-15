@@ -106,5 +106,11 @@ public class SerialReceivePane extends StackPane {
     public SerialReceiveCtrl getController() {
         return controller;
     }
+
+    public void dispose() {
+        if (controller != null) {
+            controller.dispose();
+        }
+    }
 }
 

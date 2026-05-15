@@ -531,6 +531,17 @@ public class SerialSendCtrl implements Initializable {
         this.rootPane = rootPane;
     }
 
+    public void dispose() {
+        if (serialSenderService != null && serialSenderService.isRunning()) {
+            serialSenderService.cancel();
+        }
+        closeSerial();
+        if (currStage != null) {
+            currStage.close();
+            currStage = null;
+        }
+    }
+
     /**
      * 恢复自动滚动
      */

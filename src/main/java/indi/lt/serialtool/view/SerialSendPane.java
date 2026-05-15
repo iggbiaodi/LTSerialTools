@@ -37,4 +37,10 @@ public class SerialSendPane extends SplitPane {
     public SerialSendCtrl getController() {
         return controller;
     }
+
+    public void dispose() {
+        if (controller != null) {
+            controller.dispose();
+        }
+    }
 }
