@@ -1,6 +1,7 @@
 package indi.lt.serialtool.component;
 
 import atlantafx.base.theme.Styles;
+import indi.lt.serialtool.data.BufferedDisplayLine;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.BooleanProperty;
@@ -18,35 +19,35 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.StackPane;
 import org.fxmisc.flowless.VirtualizedScrollPane;
-import org.fxmisc.richtext.InlineCssTextArea;
 import org.fxmisc.richtext.LineNumberFactory;
-import org.fxmisc.richtext.model.StyleSpans;
+import org.fxmisc.richtext.StyleClassedTextArea;
 import org.reactfx.collection.LiveList;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-public class PromptInlineCssTextArea extends StackPane {
+public class MyStyleClassedTextArea extends StackPane {
     private static final String FONT_STYLE_KEY = "app.font.promptAreaStyle";
+    private static final String LOG_META_STYLE_CLASS = "log-meta-text";
+    private static final double EPS = 1e-3;
+    private static final Pattern PLAIN_META_PATTERN = Pattern.compile("(?m)^(\\[[^\\]\\r\\n]+\\]\\s*)+");
 
-    private final InlineCssTextArea area = new InlineCssTextArea();
-    private final VirtualizedScrollPane<InlineCssTextArea> vsPane;
-
+    private final StyleClassedTextArea area = new StyleClassedTextArea();
+    private final VirtualizedScrollPane<StyleClassedTextArea> vsPane;
     private final SimpleBooleanProperty autoScroll = new SimpleBooleanProperty(true);
     private final StringProperty promptText = new SimpleStringProperty(this, "promptText", "");
 
-    private final ConcurrentLinkedQueue<String> buffer = new ConcurrentLinkedQueue<>();
-
-    // 缓存竖直滚动条
     private ScrollBar verticalBar;
-    private static final double EPS = 1e-3;
-    private final int maxLines = 500;
+    private int maxLines = 500;
 
-    public PromptInlineCssTextArea() {
+    public MyStyleClassedTextArea() {
         setPadding(new Insets(2, 2, 2, 2));
         Label promptLabel = new Label();
 
-        area.getStyleClass().add(Styles.BG_DEFAULT);
+        area.getStyleClass().addAll(Styles.BG_DEFAULT, "styled-text-area");
         vsPane = new VirtualizedScrollPane<>(area);
         getChildren().addAll(vsPane, promptLabel);
 
@@ -63,161 +64,184 @@ public class PromptInlineCssTextArea extends StackPane {
 
         area.setWrapText(true);
         area.textProperty().addListener((observable, oldValue, newValue) -> {
-            if (null == newValue || newValue.isEmpty()) {
+            if (newValue == null || newValue.isEmpty()) {
                 area.setParagraphGraphicFactory(null);
             } else if (area.getParagraphGraphicFactory() == null) {
                 area.setParagraphGraphicFactory(LineNumberFactory.get(area));
             }
         });
 
-
-        // —— 等待进入 Scene 后再尝试安装滚动条监听（无 skinProperty 可用）
         sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) {
                 Platform.runLater(this::installScrollBarListenerIfNeeded);
             }
         });
-        // 首次布局/大小变化时再尝试一次（防止过早 lookup 为空）
         vsPane.layoutBoundsProperty().addListener((o, ov, nv) -> installScrollBarListenerIfNeeded());
     }
 
     private void installScrollBarListenerIfNeeded() {
-        if (verticalBar != null || getScene() == null) return;
+        if (verticalBar != null || getScene() == null) {
+            return;
+        }
 
-        // 确保已应用 CSS/完成一次布局，再 lookup
         vsPane.applyCss();
         vsPane.layout();
 
-        // 监听滚轮/触控板滚动：只要用户滚动，就停用自动滚动（粘性关闭）
-        // 放在这里安装一次即可（本方法只会成功执行一次）
         area.addEventFilter(ScrollEvent.SCROLL, e -> setAutoScroll(false));
         vsPane.addEventFilter(ScrollEvent.SCROLL, e -> setAutoScroll(false));
 
         Set<Node> bars = vsPane.lookupAll(".scroll-bar");
-        for (Node n : bars) {
-            if (n instanceof ScrollBar sb && sb.getOrientation() == Orientation.VERTICAL) {
+        for (Node node : bars) {
+            if (node instanceof ScrollBar sb && sb.getOrientation() == Orientation.VERTICAL) {
                 verticalBar = sb;
-
-                // 用户用鼠标点击/拖动滚动条（含拖拽滑块、点击轨道）时，停用自动滚动
                 verticalBar.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> setAutoScroll(false));
                 verticalBar.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> setAutoScroll(false));
-                verticalBar.addEventFilter(ScrollEvent.SCROLL, e -> setAutoScroll(false)); // 在滚动条上滚轮
-
-                // 可选：键盘操作滚动条也视为手动干预
-                // verticalBar.addEventFilter(KeyEvent.ANY, e -> setAutoScroll(false));
-
+                verticalBar.addEventFilter(ScrollEvent.SCROLL, e -> setAutoScroll(false));
                 break;
             }
         }
     }
 
-
     private static boolean isAtBottom(ScrollBar sb) {
         return sb.getValue() >= sb.getMax() - EPS;
     }
 
-    // ---------- 对外暴露/转发属性 ----------
-    public final StringProperty promptTextProperty() {
+    public StringProperty promptTextProperty() {
         return promptText;
     }
 
-    public final String getPromptText() {
+    public String getPromptText() {
         return promptText.get();
     }
 
-    public final void setPromptText(String value) {
+    public void setPromptText(String value) {
         promptText.set(value);
     }
 
-    public final BooleanProperty editableProperty() {
+    public BooleanProperty editableProperty() {
         return area.editableProperty();
     }
 
-    public final boolean isEditable() {
+    public boolean isEditable() {
         return area.isEditable();
     }
 
-    public final void setEditable(boolean value) {
+    public void setEditable(boolean value) {
         area.setEditable(value);
     }
 
-    public final BooleanProperty wrapTextProperty() {
+    public BooleanProperty wrapTextProperty() {
         return area.wrapTextProperty();
     }
 
-    public final boolean isWrapText() {
+    public boolean isWrapText() {
         return area.isWrapText();
     }
 
-    public final void setWrapText(boolean value) {
+    public void setWrapText(boolean value) {
         area.setWrapText(value);
     }
 
-    public final String getText() {
+    public String getText() {
         return area.getText();
     }
 
-    public final void setText(String value) {
+    public void setText(String value) {
         area.replaceText(value == null ? "" : value);
-        if (verticalBar != null) autoScroll.set(isAtBottom(verticalBar));
+        applyMetaStyleToPlainText(0, area.getText());
+        if (verticalBar != null) {
+            autoScroll.set(isAtBottom(verticalBar));
+        }
     }
 
-    public InlineCssTextArea getArea() {
+    public void setLogLines(List<BufferedDisplayLine> lines, boolean showTimestamp, boolean showDataType) {
+        area.clear();
+        appendLogLines(lines, showTimestamp, showDataType);
+    }
+
+    public void appendLogLines(Collection<BufferedDisplayLine> lines, boolean showTimestamp, boolean showDataType) {
+        if (lines == null || lines.isEmpty()) {
+            return;
+        }
+        for (BufferedDisplayLine line : lines) {
+            appendLogLine(line, showTimestamp, showDataType);
+        }
+        trimToMaxLines();
+        if (autoScroll.get()) {
+            moveToEnd();
+        }
+    }
+
+    public void appendLogLine(BufferedDisplayLine line, boolean showTimestamp, boolean showDataType) {
+        if (line == null) {
+            return;
+        }
+        if (showTimestamp && !line.getTimestampText().isEmpty()) {
+            appendStyledText("[" + line.getTimestampText() + "] ", LOG_META_STYLE_CLASS);
+        }
+        if (showDataType) {
+            appendStyledText("[" + line.getDataTypeText() + "] ", LOG_META_STYLE_CLASS);
+        }
+        appendStyledText(line.getMessageText(), null);
+        appendStyledText("\n", null);
+    }
+
+    private void appendStyledText(String text, String styleClass) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        if (styleClass != null && !styleClass.isBlank()) {
+            area.append(text, styleClass);
+            return;
+        }
+        // 必须加速第二个参数“List.of()“，否则后续样式会沿用之前的样式
+        area.append(text, List.of());
+    }
+
+    public StyleClassedTextArea getArea() {
         return area;
     }
 
-    public void setStyleSpans(int i, StyleSpans<String> plain) {
-        area.setStyleSpans(i, plain);
-    }
-
     public void appendText(String text) {
-        if (text == null || text.isEmpty()) return;
-        buffer.add(text);
-        // 批量刷新 UI
-        this.flushBuffer();
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        int start = area.getLength();
+        area.appendText(text);
+        applyMetaStyleToPlainText(start, text);
+        trimToMaxLines();
+        if (autoScroll.get()) {
+            moveToEnd();
+        }
     }
 
-    private void flushBuffer() {
-        StringBuilder sb = new StringBuilder();
-        String text;
-        while ((text = buffer.poll()) != null) {
-            sb.append(text);
+    private void trimToMaxLines() {
+        if (maxLines <= 0) {
+            return;
         }
-        if (sb.isEmpty()) return;
-
-        int startPara = area.getParagraphs().size();
-        area.appendText(sb.toString());
-
-        // 裁剪超出行数，只删除头部多余行
-        int totalPara = area.getParagraphs().size();
-        if (totalPara > maxLines) {
-            int remove = totalPara - maxLines;
-            int cutOffset = area.getAbsolutePosition(remove, 0);
-            area.replaceText(0, cutOffset, "");
+        int totalParagraphs = area.getParagraphs().size();
+        if (totalParagraphs <= maxLines) {
+            return;
         }
-
-        if (autoScroll.get()) moveToEnd();
-    }
-
-    /**
-     * 使用 RichTextFX 段落 API 按“最大行数”裁剪头部文本。
-     */
-    private static void trimByMaxLines(PromptInlineCssTextArea area, int maxLines) {
-        int paraCount = area.getParagraphs().size();
-        if (paraCount <= maxLines) return;
-
-        int remove = paraCount - maxLines;
-        // 计算“第 remove 段开头”的全局偏移
+        int remove = totalParagraphs - maxLines;
         int cutOffset = area.getAbsolutePosition(remove, 0);
         area.replaceText(0, cutOffset, "");
     }
 
-    public void replaceText(int i, int cutOffset, String s) {
-        area.replaceText(i, cutOffset, s);
+    public void replaceText(int start, int end, String text) {
+        area.replaceText(start, end, text);
     }
 
-    public int getAbsolutePosition(int remove, int i) {
-        return area.getAbsolutePosition(remove, i);
+    public int getMaxLines() {
+        return maxLines;
+    }
+
+    public void setMaxLines(int maxLines) {
+        this.maxLines = Math.max(0, maxLines);
+    }
+
+    public int getAbsolutePosition(int paragraphIndex, int columnPosition) {
+        return area.getAbsolutePosition(paragraphIndex, columnPosition);
     }
 
     public LiveList<?> getParagraphs() {
@@ -231,6 +255,12 @@ public class PromptInlineCssTextArea extends StackPane {
     public void moveToEnd() {
         area.moveTo(area.getLength());
         area.requestFollowCaret();
+    }
+
+    public void restoreAutoScrollToEnd() {
+        setAutoScroll(true);
+        moveToEnd();
+        Platform.runLater(this::moveToEnd);
     }
 
     public boolean isAutoScroll() {
@@ -280,5 +310,15 @@ public class PromptInlineCssTextArea extends StackPane {
 
     private String escapeFontFamily(String fontFamily) {
         return fontFamily == null ? "" : fontFamily.replace("\\", "\\\\").replace("'", "\\'");
+    }
+
+    private void applyMetaStyleToPlainText(int baseOffset, String text) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        Matcher matcher = PLAIN_META_PATTERN.matcher(text);
+        while (matcher.find()) {
+            area.setStyleClass(baseOffset + matcher.start(), baseOffset + matcher.end(), LOG_META_STYLE_CLASS);
+        }
     }
 }

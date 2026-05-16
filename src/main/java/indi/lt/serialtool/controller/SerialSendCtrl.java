@@ -6,11 +6,12 @@ import github.nonoas.jfx.flat.ui.concurrent.TaskHandler;
 import github.nonoas.jfx.flat.ui.stage.ToastQueue;
 import indi.lt.serialtool.component.CommandTableView;
 import indi.lt.serialtool.component.InlineCssRegexHighlighter;
-import indi.lt.serialtool.component.PromptInlineCssTextArea;
+import indi.lt.serialtool.component.MyStyleClassedTextArea;
 import indi.lt.serialtool.component.SerialPortCombBox;
 import indi.lt.serialtool.component.SerialToggleButton;
 import indi.lt.serialtool.constant.CommandType;
 import indi.lt.serialtool.constant.LogType;
+import indi.lt.serialtool.data.BufferedDisplayLine;
 import indi.lt.serialtool.data.CommandRepository;
 import indi.lt.serialtool.data.LogText;
 import indi.lt.serialtool.data.SerialPortSettings;
@@ -77,7 +78,7 @@ public class SerialSendCtrl implements Initializable {
     @FXML
     private TextField tfCommand;
     @FXML
-    private PromptInlineCssTextArea taRecvArea;
+    private MyStyleClassedTextArea taRecvArea;
     @FXML
     private TextArea taSendArea;
     @FXML
@@ -421,7 +422,10 @@ public class SerialSendCtrl implements Initializable {
             LOG.info("发送成功: {}", logText);
             String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"));
             LogText sendLog = new LogText(ts, logText, LogType.SEND);
-            taRecvArea.appendText(sendLog.getLogText(cbTimeStampDisplay.isSelected(), true) + "\r\n");
+            // 发送面板追加数据
+//            taRecvArea.appendText(sendLog.getLogText(cbTimeStampDisplay.isSelected(), true) + "\r\n");
+            BufferedDisplayLine line = BufferedDisplayLine.of(System.currentTimeMillis(), ts, BufferedDisplayLine.DataType.TXT, logText);
+            taRecvArea.appendLogLine(line, true, true);
         } catch (IllegalArgumentException e) {
             LOG.error("HEX 发送失败", e);
             ToastQueue.show(AppState.getStage(), "HEX格式错误: " + e.getMessage(), 1200);

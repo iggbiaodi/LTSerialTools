@@ -3,7 +3,7 @@ package indi.lt.serialtool.service;
 
 import com.fazecast.jSerialComm.SerialPort;
 import indi.lt.serialtool.component.CommandTableView;
-import indi.lt.serialtool.component.PromptInlineCssTextArea;
+import indi.lt.serialtool.component.MyStyleClassedTextArea;
 import indi.lt.serialtool.constant.LogType;
 import indi.lt.serialtool.data.LogText;
 import indi.lt.serialtool.utils.StringUtil;
@@ -32,12 +32,12 @@ public class SerialSenderService extends Service<LogText> {
 
     private final SerialPort serialPort;
 
-    private final PromptInlineCssTextArea taRecvArea;
+    private final MyStyleClassedTextArea taRecvArea;
     private final CheckBox cbHexDisplay;
     private final CheckBox cbTimeStampDisplay;
 
     public SerialSenderService(List<CommandTableView.CommandItem> commands,
-                               SerialPort selectedPort, PromptInlineCssTextArea taRecvArea, CheckBox cbHexDisplay,
+                               SerialPort selectedPort, MyStyleClassedTextArea taRecvArea, CheckBox cbHexDisplay,
                                CheckBox cbTimeStampDisplay) {
         this.commands = commands;
         this.serialPort = selectedPort;

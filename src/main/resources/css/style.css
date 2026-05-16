@@ -1,5 +1,6 @@
 .root {
     -fx-font-size: 12px;
+    -app-log-highlight-color: rgba(255, 241, 118, 0.45);
 }
 
 .dialog-pane .content {
@@ -121,7 +122,16 @@
 
 .styled-text-area .paragraph-box .paragraph-text .text {
     -fx-line-spacing: 2 !important;
-    -fx-fill: -color-fg-default !important;
+    -fx-fill: -color-fg-default;
+}
+
+.log-meta-text {
+    -fx-fill: -color-fg-subtle !important;
+}
+
+.keyword-highlight {
+    -rtfx-background-color: -app-log-highlight-color;
+    -fx-font-weight: bold;
 }
 
 /*=======================================================*/

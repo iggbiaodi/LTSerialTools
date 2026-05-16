@@ -2,7 +2,7 @@ package indi.lt.serialtool.view;
 
 import com.fazecast.jSerialComm.SerialPort;
 import github.nonoas.jfx.flat.ui.pane.JustifiedFlowPane;
-import indi.lt.serialtool.component.PromptInlineCssTextArea;
+import indi.lt.serialtool.component.MyStyleClassedTextArea;
 import indi.lt.serialtool.component.SerialPortCombBox;
 import indi.lt.serialtool.component.SerialToggleButton;
 import indi.lt.serialtool.controller.SerialSettingsDialogCtrl;
@@ -117,7 +117,7 @@ public class WaveformPane extends BorderPane {
     private final List<Double> frameTimes = new ArrayList<>();
     private final ConcurrentLinkedQueue<FrameSnapshot> pendingFrames = new ConcurrentLinkedQueue<>();
     private final AtomicBoolean uiRefreshQueued = new AtomicBoolean(false);
-    private final PromptInlineCssTextArea dummyTextArea = new PromptInlineCssTextArea();
+    private final MyStyleClassedTextArea dummyTextArea = new MyStyleClassedTextArea();
 
     private final WaveformProtocolParser protocolParser;
 

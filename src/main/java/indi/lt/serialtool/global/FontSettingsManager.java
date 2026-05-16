@@ -1,6 +1,6 @@
 package indi.lt.serialtool.global;
 
-import indi.lt.serialtool.component.PromptInlineCssTextArea;
+import indi.lt.serialtool.component.MyStyleClassedTextArea;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -141,7 +141,7 @@ public final class FontSettingsManager {
             clearManagedStyle(textInputControl, MANAGED_TEXT_STYLE_KEY);
             return;
         }
-        if (node instanceof PromptInlineCssTextArea promptInlineCssTextArea) {
+        if (node instanceof MyStyleClassedTextArea promptInlineCssTextArea) {
             if (TEXT_FONT_TARGET_IDS.contains(promptInlineCssTextArea.getId())) {
                 promptInlineCssTextArea.applyTextFontFamily(fontFamily);
             } else {

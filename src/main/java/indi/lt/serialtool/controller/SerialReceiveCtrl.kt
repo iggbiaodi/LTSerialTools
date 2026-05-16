@@ -1,8 +1,13 @@
 package indi.lt.serialtool.controller
 
 import com.fazecast.jSerialComm.SerialPort
-import indi.lt.serialtool.component.*
-import indi.lt.serialtool.data.CircularByteBuffer
+import indi.lt.serialtool.component.InlineCssRegexHighlighter
+import indi.lt.serialtool.component.MyStyleClassedTextArea
+import indi.lt.serialtool.component.SerialPortCombBox
+import indi.lt.serialtool.component.SerialToggleButton
+import indi.lt.serialtool.component.StatusIndicator
+import indi.lt.serialtool.data.BoundedDisplayBuffer
+import indi.lt.serialtool.data.BufferedDisplayLine
 import indi.lt.serialtool.data.SerialPortSettings
 import indi.lt.serialtool.global.ConfigManager
 import indi.lt.serialtool.global.FontSettingsManager
@@ -26,18 +31,20 @@ import org.apache.logging.log4j.Logger
 import java.io.FileWriter
 import java.io.IOException
 import java.net.URL
-import java.util.*
+import java.util.Locale
+import java.util.ResourceBundle
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.Executors
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * 接收模式逻辑
- * @author Nonoas
- * @date 2025/8/22
- * @since 1.0.0
  */
 class SerialReceiveCtrl : Initializable {
     private val logger: Logger = LogManager.getLogger(MainController::class.java)
 
-    // === FXML 注入的组件 ===
     @FXML
     private lateinit var rootPane: BorderPane
 
@@ -54,7 +61,10 @@ class SerialReceiveCtrl : Initializable {
     private lateinit var cbBautRateList: ComboBox<Int>
 
     @FXML
-    private lateinit var textAreaOrigin: PromptInlineCssTextArea
+    private lateinit var textAreaOrigin: MyStyleClassedTextArea
+
+    @FXML
+    private lateinit var textAreaFilter: MyStyleClassedTextArea
 
     @FXML
     private lateinit var btnOpenSerial: SerialToggleButton
@@ -77,32 +87,36 @@ class SerialReceiveCtrl : Initializable {
     @FXML
     private lateinit var btnMoreSettings: Button
 
-    // 状态指示灯
     @FXML
     private var statusIndicator: StatusIndicator? = null
 
-    // === 内部变量 ===
     private var serialReadService: SerialReadService? = null
     private var highlighter: InlineCssRegexHighlighter? = null
     private var keyLastSerial: String? = null
-
-    // 串口参数设置
     private var serialPortSettings: SerialPortSettings = SerialPortSettings.createDefault()
-
-    // 自动保存服务
     private var autoSaveService: AutoSaveService? = null
 
-    // 环形缓冲区（用于限制内存中的数据大小）
-    private val circularBuffer: CircularByteBuffer = CircularByteBuffer()
+    private val pendingDisplayLines = ConcurrentLinkedQueue<BufferedDisplayLine>()
+    private val uiFlushQueued = AtomicBoolean(false)
+    private val filterRebuildRunning = AtomicBoolean(false)
+    private val filterRebuildDirty = AtomicBoolean(false)
+    private val filterRebuildVersion = AtomicLong(0L)
 
-    // 接收数据缓存（用于自动保存）
-    private val receiveBuffer = StringBuilder()
+    private val filterRebuildExecutor = Executors.newSingleThreadExecutor(ThreadFactory { runnable ->
+        Thread(runnable, "serial-receive-filter").apply { isDaemon = true }
+    })
+
+    private val originBuffer = BoundedDisplayBuffer(1024L)
+    private val filterBuffer = BoundedDisplayBuffer(1024L)
 
     override fun initialize(url: URL?, resourceBundle: ResourceBundle?) {
+        highlighter = InlineCssRegexHighlighter(textAreaOrigin)
+        textAreaOrigin.maxLines = 0
+        textAreaFilter.maxLines = 0
         initBautRateList()
         registerSerialEvent()
         bindFormStatePersistence()
-        initCircularBuffer()
+        initDisplayBuffers()
         initAutoSaveService()
         initStatusIndicator()
     }
@@ -143,60 +157,47 @@ class SerialReceiveCtrl : Initializable {
         cbTimeDisplay.isSelected = ConfigManager.get(formKey("timeDisplay"), Boolean::class.java, false)
         cbHighlightKeyword.isSelected = ConfigManager.get(formKey("highlightKeyword"), Boolean::class.java, false)
         tfKeyWord.text = ConfigManager.get(formKey("keyword"), "")
+        highlighter?.setPatternText(tfKeyWord.text ?: "")
+        requestFilterRebuild()
     }
 
     private fun bindFormStatePersistence() {
         cbHexDisplay.selectedProperty().addListener { _, _, newVal ->
             ConfigManager.put(formKey("hexDisplay"), newVal.toString())
+            refreshRenderedAreas()
         }
         cbTimeDisplay.selectedProperty().addListener { _, _, newVal ->
             ConfigManager.put(formKey("timeDisplay"), newVal.toString())
+            refreshRenderedAreas()
         }
         cbHighlightKeyword.selectedProperty().addListener { _, _, newVal ->
             ConfigManager.put(formKey("highlightKeyword"), newVal.toString())
         }
         tfKeyWord.textProperty().addListener { _, _, newVal ->
             ConfigManager.put(formKey("keyword"), newVal ?: "")
+            highlighter?.setPatternText(newVal ?: "")
+            requestFilterRebuild()
         }
     }
 
-    /**
-     * 初始化更多设置按钮动作
-     */
     private fun initMoreSettingsButtonAction() {
-        btnMoreSettings.setOnAction {
-            showMoreSettings()
-        }
+        btnMoreSettings.setOnAction { showMoreSettings() }
     }
 
-    /**
-     * 显示更多设置对话框
-     */
     fun showMoreSettings() {
         try {
-            // 加载对话框 FXML
             val loader = FXMLLoader(javaClass.getResource("/fxml/serial-settings-dialog.fxml"))
             val dialogPane = loader.load<DialogPane>()
-
-            // 获取控制器
             val dialogCtrl = loader.getController<SerialSettingsDialogCtrl>()
-
-            // 设置当前设置
             dialogCtrl.setSettings(serialPortSettings)
 
-            // 创建对话框
             val dialog = Dialog<SerialPortSettings>()
             dialog.dialogPane = dialogPane
             dialog.title = "串口参数设置"
             dialog.headerText = "自定义串口参数"
             FontSettingsManager.configureDialog(dialog)
-
-            // 注意：FXML 中已经定义了按钮，不需要再次添加
-
-            // 处理 OK 按钮
             dialog.resultConverter = Callback<ButtonType, SerialPortSettings> { buttonType ->
                 if (buttonType == ButtonType.OK) {
-                    // 从 UI 更新设置
                     dialogCtrl.updateSettingsFromUI()
                     dialogCtrl.getSettings()
                 } else {
@@ -204,41 +205,35 @@ class SerialReceiveCtrl : Initializable {
                 }
             }
 
-            // 显示对话框并等待结果
             dialog.showAndWait().ifPresent { settings ->
-                // 保存设置
                 serialPortSettings = settings
                 ConfigManager.putObject(serialSettingsKey(), settings)
-
-                // 应用设置到串口组件
                 cbSerialList.setSerialPortSettings(settings)
-
-                // 同步波特率到主界面下拉框（如果设置中有指定波特率）
                 cbBautRateList.selectionModel.select(settings.baudRate)
-
-                // 显示成功提示
                 UIUtil.showToast("串口参数已更新")
             }
-
         } catch (e: Exception) {
             logger.error("显示串口设置对话框失败", e)
             UIUtil.showToast("打开设置对话框失败")
         }
     }
 
-    /**
-     * 恢复自动滚动
-     */
     @FXML
     private fun restoreScrolling() {
-        textAreaOrigin.isAutoScroll = true
+        textAreaOrigin.restoreAutoScrollToEnd()
+        textAreaFilter.restoreAutoScrollToEnd()
     }
 
     @FXML
     private fun clearLogs() {
-        textAreaOrigin.area.clear()
-        circularBuffer.clear()
-        receiveBuffer.setLength(0)
+        pendingDisplayLines.clear()
+        filterRebuildVersion.incrementAndGet()
+        filterRebuildDirty.set(false)
+        originBuffer.clear()
+        filterBuffer.clear()
+        textAreaOrigin.setText("")
+        textAreaFilter.setText("")
+        highlighter?.resetTracking()
         serialReadService?.resetRecvBytesCount()
         lbRecvBytes.text = "0 B"
         statusIndicator?.setNormal()
@@ -246,8 +241,6 @@ class SerialReceiveCtrl : Initializable {
 
     @FXML
     private fun saveOriginLogs() {
-        logger.info("saveOriginLogs")
-
         val content = textAreaOrigin.text
         if (content.isNullOrEmpty()) {
             logger.info("没有日志内容可保存")
@@ -257,12 +250,12 @@ class SerialReceiveCtrl : Initializable {
         val fileChooser = FileChooser().apply {
             title = "保存日志文件"
             extensionFilters.addAll(
-                FileChooser.ExtensionFilter("文本文件", "*.txt"), FileChooser.ExtensionFilter("所有文件", "*.*")
+                FileChooser.ExtensionFilter("文本文件", "*.txt"),
+                FileChooser.ExtensionFilter("所有文件", "*.*")
             )
         }
 
         val file = fileChooser.showSaveDialog(textAreaOrigin.scene.window) ?: return
-
         try {
             FileWriter(file, false).use { writer ->
                 writer.write(content)
@@ -299,54 +292,55 @@ class SerialReceiveCtrl : Initializable {
                 closeSelectSerial()
             }
         }
+
         cbSerialList.setOnOpenSucceed {
             btnOpenSerial.isDisable = false
-            highlighter = InlineCssRegexHighlighter(textAreaOrigin).apply {
-                patternTextProperty().bind(tfKeyWord.textProperty())
-            }
-            // 清空之前的缓冲区
-            circularBuffer.clear()
-            textAreaOrigin.area.clear()
-
-            serialReadService = SerialReadService(
-                cbSerialList.selectedPort,
-                textAreaOrigin,
-                cbTimeDisplay.selectedProperty(),
-                cbHexDisplay.selectedProperty(),
-                getReceiveTimeoutMs()
-            ) { highlighter?.schedule() }.also {
-                it.setOnRecvBytesChanged { bytes ->
-                    Platform.runLater {
-                        lbRecvBytes.text = formatBytes(bytes)
-                    }
-                }
-                // 禁用内部文本追加，改为通过回调管理
-                it.setInternalAppendEnabled(false)
-                // 设置数据接收回调，用于自动保存和环形缓冲区
-                it.setOnDataReceived { data ->
-                    // 添加到环形缓冲区
-                    circularBuffer.append(data)
-                    // 更新文本区域
-                    Platform.runLater {
-                        textAreaOrigin.setText(circularBuffer.content)
-                        highlighter?.schedule()
-                    }
-                    // 添加到自动保存队列（移除换行符用于日志记录）
-                    val logData = data.trimEnd('\n', '\r')
-                    if (logData.isNotEmpty()) {
-                        autoSaveService?.appendData(logData)
-                    }
-                }
-                it.start()
-            }
-            // 如果自动保存启用，确保服务在运行
-            if (AutoSaveService.isAutoSaveEnabled()) {
-                autoSaveService?.restart()
-            }
+            prepareReceiveSession()
         }
+
         cbSerialList.setOnOpenFailed {
             btnOpenSerial.isDisable = false
             btnOpenSerial.isSelected = false
+        }
+    }
+
+    private fun prepareReceiveSession() {
+        pendingDisplayLines.clear()
+        filterRebuildVersion.incrementAndGet()
+        filterRebuildDirty.set(false)
+        originBuffer.clear()
+        filterBuffer.clear()
+        textAreaOrigin.setText("")
+        textAreaFilter.setText("")
+        textAreaOrigin.setAutoScroll(true)
+        textAreaFilter.setAutoScroll(true)
+        lbRecvBytes.text = "0 B"
+        statusIndicator?.setNormal()
+        highlighter?.setPatternText(tfKeyWord.text ?: "")
+        highlighter?.resetTracking()
+
+        serialReadService = SerialReadService(
+            cbSerialList.selectedPort,
+            textAreaOrigin,
+            cbTimeDisplay.selectedProperty(),
+            cbHexDisplay.selectedProperty(),
+            getReceiveTimeoutMs()
+        ) { highlighter?.schedule() }.also { service ->
+            service.setInternalAppendEnabled(false)
+            service.setOnRecvBytesChanged { bytes ->
+                Platform.runLater {
+                    lbRecvBytes.text = formatBytes(bytes)
+                }
+            }
+            service.setOnDisplayLineReceived { line ->
+                enqueueDisplayLine(line)
+                appendAutoSave(line)
+            }
+            service.start()
+        }
+
+        if (AutoSaveService.isAutoSaveEnabled()) {
+            autoSaveService?.restart()
         }
     }
 
@@ -384,70 +378,56 @@ class SerialReceiveCtrl : Initializable {
     }
 
     private fun closeSelectSerial() {
-        // 先取消读取服务，避免先关串口导致 read 线程报误错误日志
         serialReadService?.cancel()
         serialReadService = null
-        // 停止自动保存服务并刷新数据
         autoSaveService?.flush()
         cbSerialList.closeSelectSerial()
     }
 
-    /**
-     * 初始化状态指示灯
-     */
     private fun initStatusIndicator() {
-        // 查找或创建状态指示灯
         Platform.runLater {
             val parent = lbRecvBytes.parent
             if (parent is HBox) {
-                // 如果还没有状态指示灯，创建一个
                 if (statusIndicator == null) {
                     statusIndicator = StatusIndicator()
                 }
-                // 插入到接收量标签之前
                 val index = parent.children.indexOf(lbRecvBytes)
                 if (index >= 0 && !parent.children.contains(statusIndicator)) {
                     parent.children.add(index, statusIndicator)
-                    parent.children.add(index + 1, Label("  ")) // 添加间距
+                    parent.children.add(index + 1, Label("  "))
                 }
             }
         }
     }
 
-    /**
-     * 初始化环形缓冲区
-     */
-    private fun initCircularBuffer() {
-        // 从配置读取缓冲区容量
-        val size = MainController.getBufferCapacity()
-        val unit = MainController.getBufferCapacityUnit()
-        val capacityBytes = if (unit.equals("KB", ignoreCase = true)) size * 1024L else size * 1024L * 1024L
-
-        circularBuffer.setCapacity(capacityBytes)
-
-        // 设置溢出回调
-        circularBuffer.setOverflowCallback { isOverflow ->
+    private fun initDisplayBuffers() {
+        val capacityBytes = getConfiguredBufferCapacityBytes()
+        originBuffer.setCapacity(capacityBytes)
+        filterBuffer.setCapacity(capacityBytes)
+        originBuffer.setOverflowListener { isOverflow ->
             Platform.runLater {
                 statusIndicator?.setOverflow(isOverflow)
             }
         }
     }
 
-    /**
-     * 初始化自动保存服务
-     */
+    private fun getConfiguredBufferCapacityBytes(): Long {
+        val size = MainController.getBufferCapacity()
+        val unit = MainController.getBufferCapacityUnit()
+        return if (unit.equals("KB", ignoreCase = true)) {
+            size * 1024L
+        } else {
+            size * 1024L * 1024L
+        }
+    }
+
     private fun initAutoSaveService() {
         autoSaveService = AutoSaveService()
-
-        // 如果自动保存已启用，启动服务
         if (AutoSaveService.isAutoSaveEnabled()) {
             autoSaveService?.start()
         }
     }
 
-    /**
-     * 更新自动保存服务状态
-     */
     fun updateAutoSaveService(enabled: Boolean) {
         if (enabled) {
             if (autoSaveService?.state != javafx.concurrent.Worker.State.RUNNING) {
@@ -458,21 +438,29 @@ class SerialReceiveCtrl : Initializable {
         }
     }
 
-    /**
-     * 更新缓冲区容量
-     */
     fun updateBufferCapacity(capacityBytes: Long) {
-        circularBuffer.setCapacity(capacityBytes)
+        runOnFx {
+            originBuffer.setCapacity(capacityBytes)
+            filterBuffer.setCapacity(capacityBytes)
+            textAreaOrigin.setLogLines(originBuffer.snapshot(), shouldShowTimestamp(), shouldShowDataType())
+            textAreaFilter.setLogLines(filterBuffer.snapshot(), shouldShowTimestamp(), shouldShowDataType())
+            highlighter?.resetTracking()
+            if (textAreaOrigin.isAutoScroll) {
+                textAreaOrigin.restoreAutoScrollToEnd()
+            }
+            if (textAreaFilter.isAutoScroll) {
+                textAreaFilter.restoreAutoScrollToEnd()
+            }
+            requestFilterRebuild()
+        }
     }
 
     fun dispose() {
         updateAutoSaveService(false)
         closeSelectSerial()
+        filterRebuildExecutor.shutdownNow()
     }
 
-    /**
-     * 获取原始数据
-     */
     fun getOriginData(): String {
         return textAreaOrigin.text ?: ""
     }
@@ -481,7 +469,6 @@ class SerialReceiveCtrl : Initializable {
         val baudRates = FXCollections.observableArrayList(
             1200, 2400, 4800, 9600, 38400, 57600, 115200, 230400, 1500000, 2000000, 3000000
         )
-
         cbBautRateList.items = baudRates
         val baudRate = serialPortSettings.baudRate
         cbBautRateList.selectionModel.select(baudRate)
@@ -502,20 +489,212 @@ class SerialReceiveCtrl : Initializable {
         ConfigManager.put(formKey("timeDisplay"), cbTimeDisplay.isSelected.toString())
         ConfigManager.put(formKey("highlightKeyword"), cbHighlightKeyword.isSelected.toString())
         ConfigManager.put(formKey("keyword"), tfKeyWord.text ?: "")
-
         cbBautRateList.value?.let {
             try {
                 serialPortSettings.baudRate = it
-            } catch (ignore: NumberFormatException) {
-
+            } catch (_: NumberFormatException) {
             }
         }
         ConfigManager.putObject(serialSettingsKey(), serialPortSettings)
     }
 
-    /**
-     * 将字节数格式化为人类可读的字符串
-     */
+    private fun enqueueDisplayLine(line: BufferedDisplayLine) {
+        pendingDisplayLines.offer(line)
+        scheduleUiFlush()
+    }
+
+    private fun appendAutoSave(line: BufferedDisplayLine) {
+        val logData = line.render(shouldShowTimestamp(), shouldShowDataType()).trimEnd('\n', '\r')
+        if (logData.isNotEmpty()) {
+            autoSaveService?.appendData(logData)
+        }
+    }
+
+    private fun scheduleUiFlush() {
+        if (!uiFlushQueued.compareAndSet(false, true)) {
+            return
+        }
+        Platform.runLater {
+            try {
+                flushPendingLines()
+            } finally {
+                uiFlushQueued.set(false)
+                if (pendingDisplayLines.isNotEmpty()) {
+                    scheduleUiFlush()
+                }
+            }
+        }
+    }
+
+    private fun flushPendingLines() {
+        val lines = ArrayList<BufferedDisplayLine>()
+        while (true) {
+            val line = pendingDisplayLines.poll() ?: break
+            lines.add(line)
+        }
+        if (lines.isEmpty()) {
+            return
+        }
+
+        val originRemovedLines = ArrayList<BufferedDisplayLine>()
+        val originBatch = ArrayList<BufferedDisplayLine>(lines.size)
+        val keywords = parseKeywords(tfKeyWord.text)
+        val filterActive = keywords.isNotEmpty()
+        val rebuildingFilter = filterRebuildRunning.get()
+        val filterRemovedLines = ArrayList<BufferedDisplayLine>()
+        val filterBatch = ArrayList<BufferedDisplayLine>()
+
+        for (line in lines) {
+            originRemovedLines.addAll(originBuffer.append(line).removedLines)
+            originBatch.add(line)
+
+            if (!filterActive) {
+                continue
+            }
+            if (rebuildingFilter) {
+                filterRebuildDirty.set(true)
+                continue
+            }
+            if (line.matchesAny(keywords)) {
+                filterRemovedLines.addAll(filterBuffer.append(line).removedLines)
+                filterBatch.add(line)
+            }
+        }
+
+        applyAppend(textAreaOrigin, originBatch, originRemovedLines, cbHighlightKeyword.isSelected)
+
+        if (!filterActive) {
+            if (textAreaFilter.text?.isNotEmpty() == true) {
+                filterBuffer.clear()
+                textAreaFilter.setText("")
+            }
+        } else if (rebuildingFilter) {
+            filterRebuildDirty.set(true)
+        } else {
+            applyAppend(textAreaFilter, filterBatch, filterRemovedLines, false)
+        }
+    }
+
+    private fun applyAppend(
+        area: MyStyleClassedTextArea,
+        batch: List<BufferedDisplayLine>,
+        removedLines: List<BufferedDisplayLine>,
+        applyHighlight: Boolean
+    ) {
+        val removedChars = removedLines.sumOf { it.getRenderedCharLength(shouldShowTimestamp(), shouldShowDataType()) }
+        if (removedChars > 0) {
+            val currentLength = area.area.length
+            area.replaceText(0, removedChars.coerceAtMost(currentLength), "")
+        }
+        if (batch.isEmpty()) {
+            return
+        }
+
+        val start = area.area.length
+        area.appendLogLines(batch, shouldShowTimestamp(), shouldShowDataType())
+        val end = area.area.length
+        if (applyHighlight) {
+            highlighter?.highlightNewAppend(start, end)
+        }
+        if (area.isAutoScroll) {
+            area.restoreAutoScrollToEnd()
+        }
+    }
+
+    private fun requestFilterRebuild() {
+        runOnFx {
+            flushPendingLines()
+            val version = filterRebuildVersion.incrementAndGet()
+            val keywords = parseKeywords(tfKeyWord.text)
+            if (keywords.isEmpty()) {
+                filterRebuildDirty.set(false)
+                filterBuffer.clear()
+                textAreaFilter.setText("")
+                return@runOnFx
+            }
+            startFilterRebuild(version, keywords)
+        }
+    }
+
+    private fun startFilterRebuild(version: Long, keywords: List<String>) {
+        if (!filterRebuildRunning.compareAndSet(false, true)) {
+            filterRebuildDirty.set(true)
+            return
+        }
+
+        val snapshot = originBuffer.snapshot()
+        filterRebuildExecutor.execute {
+            val matched = ArrayList<BufferedDisplayLine>()
+            for (line in snapshot) {
+                if (line.matchesAny(keywords)) {
+                    matched.add(line)
+                }
+            }
+
+            Platform.runLater {
+                try {
+                    val currentKeywords = parseKeywords(tfKeyWord.text)
+                    if (version == filterRebuildVersion.get() && currentKeywords == keywords) {
+                        filterBuffer.replaceAll(matched)
+                        textAreaFilter.setLogLines(matched, shouldShowTimestamp(), shouldShowDataType())
+                        if (textAreaFilter.isAutoScroll) {
+                            textAreaFilter.restoreAutoScrollToEnd()
+                        }
+                    } else {
+                        filterRebuildDirty.set(true)
+                    }
+                } finally {
+                    filterRebuildRunning.set(false)
+                    if (filterRebuildDirty.getAndSet(false) || version != filterRebuildVersion.get()) {
+                        requestFilterRebuild()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun parseKeywords(rawKeywords: String?): List<String> {
+        if (rawKeywords.isNullOrBlank()) {
+            return emptyList()
+        }
+        val parts = rawKeywords.split("\\|".toRegex())
+        val keywords = ArrayList<String>(parts.size)
+        for (part in parts) {
+            val keyword = part.trim().lowercase(Locale.ROOT)
+            if (keyword.isNotEmpty()) {
+                keywords.add(keyword)
+            }
+        }
+        return keywords
+    }
+
+    private fun refreshRenderedAreas() {
+        runOnFx {
+            flushPendingLines()
+            textAreaOrigin.setLogLines(originBuffer.snapshot(), shouldShowTimestamp(), shouldShowDataType())
+            if (textAreaOrigin.isAutoScroll) {
+                textAreaOrigin.restoreAutoScrollToEnd()
+            }
+            textAreaFilter.setLogLines(filterBuffer.snapshot(), shouldShowTimestamp(), shouldShowDataType())
+            if (textAreaFilter.isAutoScroll) {
+                textAreaFilter.restoreAutoScrollToEnd()
+            }
+            requestFilterRebuild()
+        }
+    }
+
+    private fun shouldShowTimestamp(): Boolean = cbTimeDisplay.isSelected
+
+    private fun shouldShowDataType(): Boolean = cbHexDisplay.isSelected
+
+    private fun runOnFx(runnable: () -> Unit) {
+        if (Platform.isFxApplicationThread()) {
+            runnable()
+        } else {
+            Platform.runLater(runnable)
+        }
+    }
+
     private fun formatBytes(bytes: Long): String {
         return when {
             bytes < 1024 -> "$bytes B"
