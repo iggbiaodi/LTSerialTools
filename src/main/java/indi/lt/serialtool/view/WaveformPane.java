@@ -131,6 +131,7 @@ public class WaveformPane extends BorderPane {
     private boolean updatingTimeline = false;
     private double xZoomFactor = 1.0;
     private double yZoomFactor = 1.0;
+    private int nextDataIndex = 0;
 
     public WaveformPane() {
         protocolParser = new WaveformProtocolParser(getSelectedDataTypeOrDefault(), this::handleParsedFrame);
@@ -194,7 +195,7 @@ public class WaveformPane extends BorderPane {
         );
         viewControlBox.setAlignment(Pos.CENTER_LEFT);
 
-        xAxis.setLabel("时间 (s)");
+        xAxis.setLabel("采样点");
         xAxis.setForceZeroInRange(false);
         xAxis.setAutoRanging(false);
         yAxis.setLabel("数据值");
@@ -410,8 +411,10 @@ public class WaveformPane extends BorderPane {
         followLatest = true;
         xZoomFactor = 1.0;
         yZoomFactor = 1.0;
+        nextDataIndex = 0;
         runOnFx(() -> {
             lineChart.getData().clear();
+            legendBox.getChildren().clear();
             waveformSeries.clear();
             legendItems.clear();
             lbRecvBytes.setText("0 B");
@@ -450,9 +453,10 @@ public class WaveformPane extends BorderPane {
         frameTimes.add(snapshot.timeSeconds());
         trimFrameTimes();
         ensureSeriesCount(values.length);
+        int currentIndex = nextDataIndex++;
         for (int i = 0; i < values.length; i++) {
             XYChart.Series<Number, Number> series = waveformSeries.get(i);
-            series.getData().add(new XYChart.Data<>(snapshot.timeSeconds(), values[i]));
+            series.getData().add(new XYChart.Data<>(currentIndex, values[i]));
             trimSeries(series);
             legendItems.get(i).setCurrentValue(values[i]);
         }
@@ -531,9 +535,11 @@ public class WaveformPane extends BorderPane {
     private void clearWaveform() {
         protocolParser.reset();
         pendingFrames.clear();
+        nextDataIndex = 0;
         runOnFx(() -> {
             frameTimes.clear();
             lineChart.getData().clear();
+            legendBox.getChildren().clear();
             waveformSeries.clear();
             legendItems.clear();
             resetViewState();
@@ -701,14 +707,24 @@ public class WaveformPane extends BorderPane {
         }
         int endIndex = Math.min(frameTimes.size() - 1, viewStartIndex + windowPointCount - 1);
 
-        double lowerTime = frameTimes.get(viewStartIndex);
-        double upperTime = frameTimes.get(endIndex);
-        double timeSpan = Math.max(upperTime - lowerTime, 0.001);
-        double xPadding = Math.max(timeSpan * 0.02, 0.001);
-        xAxis.setLowerBound(lowerTime - xPadding);
-        xAxis.setUpperBound(upperTime + xPadding);
+        double lowerX;
+        double upperX;
+        if (waveformSeries.isEmpty() || waveformSeries.get(0).getData().isEmpty()) {
+            lowerX = viewStartIndex;
+            upperX = endIndex;
+        } else {
+            List<XYChart.Data<Number, Number>> data = waveformSeries.get(0).getData();
+            int dataStart = Math.min(viewStartIndex, data.size() - 1);
+            int dataEnd = Math.min(endIndex, data.size() - 1);
+            lowerX = data.get(Math.max(0, dataStart)).getXValue().doubleValue();
+            upperX = data.get(Math.max(0, dataEnd)).getXValue().doubleValue();
+        }
+        double xSpan = Math.max(upperX - lowerX, 1);
+        double xPadding = Math.max(xSpan * 0.02, 0.5);
+        xAxis.setLowerBound(lowerX - xPadding);
+        xAxis.setUpperBound(upperX + xPadding);
 
-        updateYAxis(lowerTime, upperTime);
+        updateYAxis(lowerX, upperX);
         updateTimeline(windowPointCount, maxStart);
         lbViewInfo.setText(
                 "显示窗口: " + windowPointCount + " 点  X缩放:" + formatZoomText(xZoomFactor)
@@ -716,7 +732,7 @@ public class WaveformPane extends BorderPane {
         );
     }
 
-    private void updateYAxis(double lowerTime, double upperTime) {
+    private void updateYAxis(double lowerX, double upperX) {
         double min = Double.POSITIVE_INFINITY;
         double max = Double.NEGATIVE_INFINITY;
 
@@ -729,10 +745,10 @@ public class WaveformPane extends BorderPane {
             for (int i = data.size() - 1; i >= 0; i--) {
                 XYChart.Data<Number, Number> point = data.get(i);
                 double x = point.getXValue().doubleValue();
-                if (x > upperTime) {
+                if (x > upperX) {
                     continue;
                 }
-                if (x < lowerTime) {
+                if (x < lowerX) {
                     break;
                 }
                 double y = point.getYValue().doubleValue();
@@ -784,9 +800,9 @@ public class WaveformPane extends BorderPane {
     }
 
     private void resetAxisBounds() {
-        xAxis.setLowerBound(0);
+        xAxis.setLowerBound(-1);
         xAxis.setUpperBound(1);
-        yAxis.setLowerBound(0);
+        yAxis.setLowerBound(-1);
         yAxis.setUpperBound(1);
     }
 
