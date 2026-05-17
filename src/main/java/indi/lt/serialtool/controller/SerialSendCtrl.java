@@ -386,7 +386,7 @@ public class SerialSendCtrl implements Initializable {
     }
 
     /**
-     * 发送数据
+     * 手动发送数据
      */
     private void sendData() {
         if (cbSerialList.getSelectedPort() == null || !cbSerialList.getSelectedPort().isOpen()) {
@@ -420,9 +420,11 @@ public class SerialSendCtrl implements Initializable {
 
             cbSerialList.getSelectedPort().writeBytes(data, data.length);
             LOG.info("发送成功: {}", logText);
+            String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"));
+
             // 发送面板追加数据
-            BufferedDisplayLine line = BufferedDisplayLine.of(System.currentTimeMillis(), null, BufferedDisplayLine.DataType.TXT, MessageDirection.SEND, logText);
-            taRecvArea.appendLogLine(line, true, true);
+            BufferedDisplayLine line = BufferedDisplayLine.of(0L, ts, BufferedDisplayLine.DataType.TXT, MessageDirection.SEND, logText);
+            taRecvArea.appendLogLine(line, true, true, true);
         } catch (IllegalArgumentException e) {
             LOG.error("HEX 发送失败", e);
             ToastQueue.show(AppState.getStage(), "HEX格式错误: " + e.getMessage(), 1200);

@@ -11,7 +11,7 @@ public enum MessageDirection {
     SEND("TX"),
     ;
 
-    private String type;
+    private final String type;
 
     private MessageDirection(String type) {
         this.type = type;

@@ -68,6 +68,10 @@ public final class BufferedDisplayLine {
         return render(showTimestamp, showDataType).length();
     }
 
+    public MessageDirection getMessageDirection() {
+        return messageDirection;
+    }
+
     public String render(boolean showTimestamp, boolean showDataType) {
         StringBuilder sb = new StringBuilder(messageText.length() + 32);
         if (showTimestamp && !timestampText.isEmpty()) {

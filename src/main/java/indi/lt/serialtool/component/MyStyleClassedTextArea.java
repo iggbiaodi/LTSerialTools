@@ -185,11 +185,18 @@ public class MyStyleClassedTextArea extends StackPane {
     }
 
     public void appendLogLine(BufferedDisplayLine line, boolean showTimestamp, boolean showDataType) {
+        appendLogLine(line, showTimestamp, showDataType, false);
+    }
+
+    public void appendLogLine(BufferedDisplayLine line, boolean showTimestamp, boolean showDataType,boolean showMsgDirection) {
         if (line == null) {
             return;
         }
         if (showTimestamp && !line.getTimestampText().isEmpty()) {
             appendStyledText("[" + line.getTimestampText() + "] ", LOG_META_STYLE_CLASS);
+        }
+        if (showMsgDirection) {
+            appendStyledText("[" + line.getMessageDirection().getType() + "] ", LOG_META_STYLE_CLASS);
         }
         if (showDataType) {
             appendStyledText("[" + line.getDataTypeText() + "] ", LOG_META_STYLE_CLASS);
@@ -197,6 +204,7 @@ public class MyStyleClassedTextArea extends StackPane {
         appendStyledText(line.getMessageText(), null);
         appendStyledText("\n", null);
     }
+
 
     private void appendStyledText(String text, String styleClass) {
         if (text == null || text.isEmpty()) {
