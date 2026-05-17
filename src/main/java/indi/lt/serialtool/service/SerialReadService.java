@@ -3,7 +3,7 @@ package indi.lt.serialtool.service;
 import com.fazecast.jSerialComm.SerialPort;
 import com.fazecast.jSerialComm.SerialPortTimeoutException;
 import indi.lt.serialtool.component.MyStyleClassedTextArea;
-import indi.lt.serialtool.constant.LogType;
+import indi.lt.serialtool.constant.MessageDirection;
 import indi.lt.serialtool.data.BufferedDisplayLine;
 import indi.lt.serialtool.data.BufferedDisplayLine.DataType;
 import indi.lt.serialtool.data.LogText;
@@ -346,6 +346,7 @@ public class SerialReadService extends Service<Void> {
                 receivedAtMillis,
                 timeText,
                 hexMode ? DataType.HEX : DataType.TXT,
+                MessageDirection.RECEIVE,
                 raw
         );
         LogText line = formatLine(raw, receivedAtMillis);
@@ -368,7 +369,7 @@ public class SerialReadService extends Service<Void> {
     private LogText formatLine(String raw, long receivedAtMillis) {
         String ts = LocalDateTime.ofInstant(Instant.ofEpochMilli(receivedAtMillis), SYSTEM_ZONE)
                 .format(TIME_FORMATTER);
-        return new LogText(ts, raw, LogType.RECEIVE);
+        return new LogText(ts, raw, MessageDirection.RECEIVE);
     }
 
     private void tryClosePort() {

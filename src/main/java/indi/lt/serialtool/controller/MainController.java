@@ -1,11 +1,11 @@
 package indi.lt.serialtool.controller;
 
 import github.nonoas.jfx.flat.ui.theme.Theme;
-import indi.lt.serialtool.SerialApplication;
 import indi.lt.serialtool.component.CommandTableView;
+import indi.lt.serialtool.component.FontFamilyComboBox;
+import indi.lt.serialtool.component.ThemeComboBox;
 import indi.lt.serialtool.global.ConfigManager;
 import indi.lt.serialtool.global.FontSettingsManager;
-import indi.lt.serialtool.global.ThemeManager;
 import indi.lt.serialtool.service.AutoSaveService;
 import indi.lt.serialtool.utils.ZipUtil;
 import indi.lt.serialtool.utils.UIUtil;
@@ -29,7 +29,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.scene.text.Font;
 import javafx.stage.FileChooser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -41,13 +40,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.ResourceBundle;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static indi.lt.serialtool.global.ConfigManager.DEFAULT_RECEIVE_TIMEOUT_MS;
@@ -62,8 +55,6 @@ import static org.kordamp.ikonli.material2.Material2OutlinedMZ.TUNE;
 
 public class MainController implements Initializable {
     private static final String KEY_AUTO_SAVE = "main.form.autoSave";
-    private static final String DEFAULT_THEME_NAME = "PrimerLight";
-
     private final Logger LOG = LogManager.getLogger(MainController.class);
 
     @FXML
@@ -139,7 +130,7 @@ public class MainController implements Initializable {
         receivePanes.add(serialReceivePane1);
         receivePanes.add(serialReceivePane2);
 
-        String dividePostions = ConfigManager.get(KEY_RECEIVE_SPLIT_PANE_DIVIDER_POSITIONS,"0.5");
+        String dividePostions = ConfigManager.get(KEY_RECEIVE_SPLIT_PANE_DIVIDER_POSITIONS, "0.5");
         spReceive.getItems().addAll(serialReceivePane1, serialReceivePane2);
         double[] dividePositionList = Arrays.stream(dividePostions.split(",")).mapToDouble(Double::parseDouble).toArray();
         Platform.runLater(() -> spReceive.setDividerPositions(dividePositionList));
@@ -319,7 +310,7 @@ public class MainController implements Initializable {
         region.setMinHeight(10);
         toolBar.getItems().add(0, logoView);
         toolBar.getItems().add(1, region);
-        currentTheme = resolveDefaultTheme();
+        currentTheme = ThemeComboBox.resolveDefaultTheme();
 
         autoSaveCheck.setSelected(AutoSaveService.isAutoSaveEnabled());
         autoSaveCheck.selectedProperty().addListener((obs, oldVal, newVal) -> {
@@ -664,9 +655,9 @@ public class MainController implements Initializable {
         dialog.setHeaderText("设置主题、界面字体和文本框字体");
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
 
-        ComboBox<Theme> themeBox = createThemeBox(currentTheme);
-        ComboBox<String> uiFontBox = createFontFamilyBox(FontSettingsManager.getUiFontFamily());
-        ComboBox<String> textFontBox = createFontFamilyBox(FontSettingsManager.getTextFontFamily());
+        ThemeComboBox themeBox = new ThemeComboBox(currentTheme);
+        FontFamilyComboBox uiFontBox = new FontFamilyComboBox(FontSettingsManager.getUiFontFamily());
+        FontFamilyComboBox textFontBox = new FontFamilyComboBox(FontSettingsManager.getTextFontFamily());
         Label themeLabel = new Label("主题:");
         Label uiLabel = new Label("界面字体:");
         Label textLabel = new Label("文本框字体:");
@@ -714,87 +705,14 @@ public class MainController implements Initializable {
             if (buttonType != ButtonType.OK) {
                 return;
             }
-            applyTheme(themeBox.getValue());
+            Theme appliedTheme = themeBox.applySelectedTheme();
+            if (appliedTheme != null) {
+                currentTheme = appliedTheme;
+            }
             FontSettingsManager.saveFontFamilies(uiFontBox.getValue(), textFontBox.getValue());
             FontSettingsManager.applyToOpenWindows();
             UIUtil.showToast("外观设置已保存");
         });
-    }
-
-    private ComboBox<Theme> createThemeBox(Theme selectedTheme) {
-        ComboBox<Theme> themeBox = new ComboBox<>();
-        themeBox.getItems().addAll(ThemeManager.getAll());
-        themeBox.setValue(selectedTheme);
-        themeBox.setMaxWidth(Double.MAX_VALUE);
-        themeBox.setVisibleRowCount(8);
-        themeBox.setCellFactory(listView -> new ListCell<>() {
-            @Override
-            protected void updateItem(Theme item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty || item == null ? null : item.getName());
-            }
-        });
-        themeBox.setButtonCell(new ListCell<>() {
-            @Override
-            protected void updateItem(Theme item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty || item == null ? null : item.getName());
-            }
-        });
-        return themeBox;
-    }
-
-    private ComboBox<String> createFontFamilyBox(String selectedFont) {
-        ComboBox<String> fontBox = new ComboBox<>();
-        fontBox.getItems().addAll(FontSettingsManager.getAvailableFontFamilies());
-        fontBox.setValue(selectedFont);
-        fontBox.setMaxWidth(Double.MAX_VALUE);
-        fontBox.setVisibleRowCount(12);
-        fontBox.setCellFactory(listView -> new ListCell<>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                    setFont(Font.getDefault());
-                    return;
-                }
-                setText(item);
-                setFont(Font.font(item, 13));
-            }
-        });
-        fontBox.setButtonCell(new ListCell<>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                    setFont(Font.getDefault());
-                    return;
-                }
-                setText(item);
-                setFont(Font.font(item, 13));
-            }
-        });
-        return fontBox;
-    }
-
-    private Theme resolveDefaultTheme() {
-        List<Theme> themes = ThemeManager.getAll();
-        for (Theme theme : themes) {
-            if (DEFAULT_THEME_NAME.equals(theme.getName())) {
-                return theme;
-            }
-        }
-        return themes.isEmpty() ? null : themes.get(0);
-    }
-
-    private void applyTheme(Theme theme) {
-        if (theme == null) {
-            return;
-        }
-        currentTheme = theme;
-        SerialApplication.setUserAgentStylesheet(theme.getUserAgentStylesheet());
     }
 
     public String getDividePosition() {

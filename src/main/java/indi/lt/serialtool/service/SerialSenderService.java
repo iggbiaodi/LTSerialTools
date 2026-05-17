@@ -4,8 +4,8 @@ package indi.lt.serialtool.service;
 import com.fazecast.jSerialComm.SerialPort;
 import indi.lt.serialtool.component.CommandTableView;
 import indi.lt.serialtool.component.MyStyleClassedTextArea;
-import indi.lt.serialtool.constant.LogType;
-import indi.lt.serialtool.data.LogText;
+import indi.lt.serialtool.constant.MessageDirection;
+import indi.lt.serialtool.data.BufferedDisplayLine;
 import indi.lt.serialtool.utils.StringUtil;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
@@ -18,13 +18,16 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+import static indi.lt.serialtool.data.BufferedDisplayLine.DataType.HEX;
+import static indi.lt.serialtool.data.BufferedDisplayLine.DataType.TXT;
+
 
 /**
  * @author Nonoas
  * @date 2025/9/23
  * @since
  */
-public class SerialSenderService extends Service<LogText> {
+public class SerialSenderService extends Service<BufferedDisplayLine> {
 
     private final Logger LOG = LogManager.getLogger(SerialSenderService.class);
 
@@ -47,16 +50,16 @@ public class SerialSenderService extends Service<LogText> {
 
         valueProperty().addListener((observableValue, unused, newVal) -> {
             if (null != newVal) {
-                taRecvArea.appendText(newVal.getLogText(cbTimeStampDisplay.isSelected(), true) + "\r\n");
+                taRecvArea.appendLogLine(newVal, true, true);
             }
         });
     }
 
     @Override
-    protected Task<LogText> createTask() {
+    protected Task<BufferedDisplayLine> createTask() {
         return new Task<>() {
             @Override
-            protected LogText call() throws Exception {
+            protected BufferedDisplayLine call() throws Exception {
                 int commandIndex = 0;
                 while (true) {
                     // 检查任务是否被取消
@@ -94,7 +97,17 @@ public class SerialSenderService extends Service<LogText> {
                         LOG.info("已发送: {}", currentCommand.getCommand());
 
                         String logBody = cbHexDisplay.isSelected() ? StringUtil.bytesToHexString(data) : command;
-                        updateValue(genLogText(logBody));
+                        BufferedDisplayLine.DataType dataType;
+                        ;
+                        if (isHexCommand) {
+                            dataType = HEX;
+                        } else {
+                            dataType = TXT;
+                        }
+
+                        String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"));
+                        BufferedDisplayLine displayLine = BufferedDisplayLine.of(0L, ts, dataType, MessageDirection.SEND, logBody);
+                        updateValue(displayLine);
                     } catch (Exception e) {
                         LOG.error("指令[{}]发送失败", currentCommand.getCommand(), e);
                     }
@@ -106,8 +119,4 @@ public class SerialSenderService extends Service<LogText> {
         };
     }
 
-    private LogText genLogText(String command) {
-        String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"));
-        return new LogText(ts, command, LogType.SEND);
-    }
 }

@@ -67,7 +67,19 @@ public class MyStyleClassedTextArea extends StackPane {
             if (newValue == null || newValue.isEmpty()) {
                 area.setParagraphGraphicFactory(null);
             } else if (area.getParagraphGraphicFactory() == null) {
-                area.setParagraphGraphicFactory(LineNumberFactory.get(area));
+                area.setParagraphGraphicFactory(idx -> {
+                    Label label = new Label(String.valueOf(idx + 1));
+                    label.getStyleClass().add("lineno");
+                    label.setAlignment(Pos.CENTER_RIGHT);
+                    label.setMinWidth(30);
+                    label.setPrefWidth(30);
+                    label.setMaxWidth(30);
+
+                    StackPane wrapper = new StackPane(label);
+                    wrapper.getStyleClass().add("lineno-wrap");
+                    return wrapper;
+                });
+
             }
         });
 

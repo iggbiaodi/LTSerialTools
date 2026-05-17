@@ -1,14 +1,14 @@
 package indi.lt.serialtool.data;
 
-import indi.lt.serialtool.constant.LogType;
+import indi.lt.serialtool.constant.MessageDirection;
 
 public class LogText {
     private final String timeStamp;
     private final String text;
 
-    private final LogType logType;
+    private final MessageDirection logType;
 
-    public LogText(String timeStamp, String text, LogType logType) {
+    public LogText(String timeStamp, String text, MessageDirection logType) {
         this.logType = logType;
         this.timeStamp = timeStamp;
         this.text = text;

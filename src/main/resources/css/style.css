@@ -110,14 +110,20 @@
 /* 行号样式 */
 .lineno {
     -fx-background-color: transparent;
+    -fx-border-color: -color-border-default;
+    -fx-border-width: 0 1px 0 0;
     -fx-text-fill: -color-fg-subtle;
     -fx-font-style: normal; /* 禁止斜体 */
     -fx-font-weight: normal; /* 禁止加粗（可选） */
     -fx-padding: 0 5 0 5;
 }
+.lineno-wrap {
+    -fx-padding: 0 8 0 0;
+}
 
 .styled-text-area {
     -fx-background-color: -color-bg-default;
+    -fx-padding: 10;
 }
 
 .styled-text-area .paragraph-box .paragraph-text .text {

@@ -1,5 +1,7 @@
 package indi.lt.serialtool.data;
 
+import indi.lt.serialtool.constant.MessageDirection;
+
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
@@ -17,14 +19,16 @@ public final class BufferedDisplayLine {
     private final long receivedAtMillis;
     private final String timestampText;
     private final DataType dataType;
+    private final MessageDirection messageDirection;
     private final String messageText;
     private final String searchableText;
     private final int byteSize;
 
-    private BufferedDisplayLine(long receivedAtMillis, String timestampText, DataType dataType, String messageText) {
+    private BufferedDisplayLine(long receivedAtMillis, String timestampText, DataType dataType, MessageDirection messageDirection, String messageText) {
         this.receivedAtMillis = receivedAtMillis;
         this.timestampText = timestampText == null ? "" : timestampText;
         this.dataType = dataType == null ? DataType.TXT : dataType;
+        this.messageDirection = messageDirection;
         this.messageText = messageText == null ? "" : messageText;
         this.searchableText = (this.timestampText + " " + this.dataType.name() + " " + this.messageText)
                 .toLowerCase(Locale.ROOT);
@@ -32,8 +36,8 @@ public final class BufferedDisplayLine {
                 .getBytes(StandardCharsets.UTF_8).length;
     }
 
-    public static BufferedDisplayLine of(long receivedAtMillis, String timestampText, DataType dataType, String messageText) {
-        return new BufferedDisplayLine(receivedAtMillis, timestampText, dataType, messageText);
+    public static BufferedDisplayLine of(long receivedAtMillis, String timestampText, DataType dataType, MessageDirection messageDirection, String messageText) {
+        return new BufferedDisplayLine(receivedAtMillis, timestampText, dataType, messageDirection, messageText);
     }
 
     public long getReceivedAtMillis() {
@@ -89,6 +93,6 @@ public final class BufferedDisplayLine {
     }
 
     public BufferedDisplayLine withMessageText(String nextMessageText) {
-        return new BufferedDisplayLine(receivedAtMillis, timestampText, dataType, nextMessageText);
+        return new BufferedDisplayLine(receivedAtMillis, timestampText, dataType, messageDirection, nextMessageText);
     }
 }
