@@ -36,6 +36,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.TableRow;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
@@ -126,6 +127,9 @@ public class SerialSendCtrl implements Initializable {
     private SerialReadService serialReadService;
 
     private InlineCssRegexHighlighter highlighter;
+
+    /** 待发送的单条指令（串口打开成功后自动发送） */
+    private CommandTableView.CommandItem pendingSingleSend;
 
     // 保存上次串口选择的 key
     private final String keyLastSerial = "sendModeLastSerialPort";
@@ -223,6 +227,23 @@ public class SerialSendCtrl implements Initializable {
         });
         tableContextMenu.getItems().addAll(editItem, deleteItem);
         table.setContextMenu(tableContextMenu);
+
+        // 注入发送回调，让表格中的"发送"按钮可用
+        table.setOnSendCommand(item -> {
+            sendSingleCommand(item);
+            return kotlin.Unit.INSTANCE;
+        });
+
+        // 双击行发送指令
+        table.setRowFactory(tv -> {
+            TableRow<CommandTableView.CommandItem> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (event.getClickCount() == 2 && !row.isEmpty()) {
+                    sendSingleCommand(row.getItem());
+                }
+            });
+            return row;
+        });
     }
 
     /**
@@ -360,6 +381,12 @@ public class SerialSendCtrl implements Initializable {
             if (btnScheduleSend.isSelected() && (serialSenderService == null || !serialSenderService.isRunning())) {
                 startSendCommand();
             }
+            // 如果有待发送的单条指令，发送它
+            if (pendingSingleSend != null) {
+                CommandTableView.CommandItem item = pendingSingleSend;
+                pendingSingleSend = null;
+                doSendCommand(item);
+            }
         });
         cbSerialList.setOnOpenFailed(() -> {
             btnOpenSerial.setDisable(false);
@@ -444,43 +471,75 @@ public class SerialSendCtrl implements Initializable {
     }
 
     /**
-     * 手动发送数据
+     * 手动发送数据（串口未开时自动打开再发送）
      */
     private void sendData() {
-        if (cbSerialList.getSelectedPort() == null || !cbSerialList.getSelectedPort().isOpen()) {
-            ToastQueue.show(AppState.getStage(), "串口未打开", 800);
-            return;
-        }
-
         String text = taSendArea.getText();
         if (text == null || text.trim().isEmpty()) {
             ToastQueue.show(AppState.getStage(), "发送内容不能为空", 800);
             return;
         }
 
+        if (cbSerialList.getSelectedPort() == null || !cbSerialList.getSelectedPort().isOpen()) {
+            String type = cbHexSend.isSelected() ? "HEX" : "TXT";
+            CommandTableView.CommandItem tempItem = new CommandTableView.CommandItem("__temp__", "", text, type);
+            pendingSingleSend = tempItem;
+            cbSerialList.openSelectedSerial();
+            btnOpenSerial.setSelected(true);
+            return;
+        }
+
+        doSendText(text, cbHexSend.isSelected(), lineBreak.isSelected());
+    }
+
+    /**
+     * 从指令表格发送单条指令（双击 / 发送按钮）
+     */
+    private void sendSingleCommand(CommandTableView.CommandItem item) {
+        if (cbSerialList.getSelectedPort() == null || !cbSerialList.getSelectedPort().isOpen()) {
+            // 串口未打开 → 自动打开，打开成功后自动发送
+            pendingSingleSend = item;
+            cbSerialList.openSelectedSerial();
+            btnOpenSerial.setSelected(true);
+            return;
+        }
+        doSendCommand(item);
+    }
+
+    /**
+     * 实际执行单条指令发送（串口已打开时调用）
+     */
+    private void doSendCommand(CommandTableView.CommandItem item) {
+        String text = item.getCommand();
+        if (text == null || text.trim().isEmpty()) {
+            return;
+        }
+        boolean isHex = "HEX".equals(item.getCommandType());
+        doSendText(text, isHex, false);
+    }
+
+    /**
+     * 核心发送逻辑：将文本按指定模式发送到串口
+     */
+    private void doSendText(String text, boolean isHex, boolean addLineBreak) {
         try {
-            boolean isHexSend = cbHexSend.isSelected();
             byte[] data;
             String logText;
-
-            if (isHexSend) {
+            if (isHex) {
                 data = StringUtil.hexStringToBytes(text);
-                if (lineBreak.isSelected()) {
+                if (addLineBreak) {
                     data = Arrays.copyOf(data, data.length + 1);
                     data[data.length - 1] = (byte) '\n';
                 }
                 logText = StringUtil.bytesToHexString(data);
             } else {
-                String content = lineBreak.isSelected() ? text + "\n" : text;
+                String content = addLineBreak ? text + "\n" : text;
                 data = content.getBytes(StandardCharsets.UTF_8);
                 logText = content;
             }
-
             cbSerialList.getSelectedPort().writeBytes(data, data.length);
             LOG.info("发送成功: {}", logText);
             String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"));
-
-            // 发送面板追加数据
             BufferedDisplayLine line = BufferedDisplayLine.of(0L, ts, BufferedDisplayLine.DataType.TXT, MessageDirection.SEND, logText);
             taRecvArea.appendLogLine(line, true, true, true);
         } catch (IllegalArgumentException e) {

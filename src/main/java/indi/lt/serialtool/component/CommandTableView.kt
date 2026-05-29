@@ -26,6 +26,9 @@ import org.apache.logging.log4j.Logger
 class CommandTableView : TableView<CommandItem?>(FXCollections.observableArrayList()) {
     private val logger: Logger = LogManager.getLogger(CommandTableView::class.java)
 
+    /** 发送指令回调，由外部注入发送逻辑 */
+    var onSendCommand: ((CommandItem) -> Unit)? = null
+
 
     init {
         columnResizePolicy = CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS
@@ -62,10 +65,10 @@ class CommandTableView : TableView<CommandItem?>(FXCollections.observableArrayLi
                     deleteBtn.minWidth = 50.0
                     deleteBtn.styleClass.add(Styles.DANGER)
                     box.alignment = Pos.CENTER_LEFT
-                    sendBtn.onAction = EventHandler { e: ActionEvent? ->
+                    sendBtn.onAction = EventHandler {
                         val item = item
                         if (item != null) {
-                            logger.info("发送: " + item.getCommand())
+                            onSendCommand?.invoke(item)
                         }
                     }
                     sendBtn.styleClass.add(Styles.ACCENT)
