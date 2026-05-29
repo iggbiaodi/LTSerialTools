@@ -42,6 +42,9 @@ public class MyStyleClassedTextArea extends StackPane {
 
     private ScrollBar verticalBar;
     private int maxLines = 500;
+    private int lastLineNoDigits = 1;
+    private static final double DIGIT_CHAR_WIDTH = 8.0;
+    private static final double LINE_NO_SIDE_PADDING = 10.0;
 
     public MyStyleClassedTextArea() {
         setPadding(new Insets(2, 2, 2, 2));
@@ -66,20 +69,9 @@ public class MyStyleClassedTextArea extends StackPane {
         area.textProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue == null || newValue.isEmpty()) {
                 area.setParagraphGraphicFactory(null);
+                lastLineNoDigits = 1;
             } else if (area.getParagraphGraphicFactory() == null) {
-                area.setParagraphGraphicFactory(idx -> {
-                    Label label = new Label(String.valueOf(idx + 1));
-                    label.getStyleClass().add("lineno");
-                    label.setAlignment(Pos.CENTER_RIGHT);
-                    label.setMinWidth(30);
-                    label.setPrefWidth(30);
-                    label.setMaxWidth(30);
-
-                    StackPane wrapper = new StackPane(label);
-                    wrapper.getStyleClass().add("lineno-wrap");
-                    return wrapper;
-                });
-
+                configureLineNoFactory();
             }
         });
 
@@ -116,6 +108,34 @@ public class MyStyleClassedTextArea extends StackPane {
 
     private static boolean isAtBottom(ScrollBar sb) {
         return sb.getValue() >= sb.getMax() - EPS;
+    }
+
+    private void configureLineNoFactory() {
+        int total = area.getParagraphs().size();
+        int digits = total <= 1 ? 1 : String.valueOf(total).length();
+        lastLineNoDigits = digits;
+        final double width = digits * DIGIT_CHAR_WIDTH + LINE_NO_SIDE_PADDING;
+        area.setParagraphGraphicFactory(idx -> {
+            Label label = new Label(String.valueOf(idx + 1));
+            label.getStyleClass().add("lineno");
+            label.setAlignment(Pos.CENTER_RIGHT);
+            label.setMinWidth(width);
+            label.setPrefWidth(width);
+            label.setMaxWidth(width);
+            StackPane wrapper = new StackPane(label);
+            wrapper.getStyleClass().add("lineno-wrap");
+            return wrapper;
+        });
+    }
+
+    private void ensureLineNoWidth() {
+        int total = area.getParagraphs().size();
+        int digits = total <= 1 ? 1 : String.valueOf(total).length();
+        if (digits > lastLineNoDigits) {
+            area.setParagraphGraphicFactory(null);
+            configureLineNoFactory();
+            area.requestLayout();
+        }
     }
 
     public StringProperty promptTextProperty() {
@@ -203,6 +223,7 @@ public class MyStyleClassedTextArea extends StackPane {
         }
         appendStyledText(line.getMessageText(), null);
         appendStyledText("\n", null);
+        ensureLineNoWidth();
     }
 
 
@@ -237,15 +258,18 @@ public class MyStyleClassedTextArea extends StackPane {
 
     private void trimToMaxLines() {
         if (maxLines <= 0) {
+            ensureLineNoWidth();
             return;
         }
         int totalParagraphs = area.getParagraphs().size();
         if (totalParagraphs <= maxLines) {
+            ensureLineNoWidth();
             return;
         }
         int remove = totalParagraphs - maxLines;
         int cutOffset = area.getAbsolutePosition(remove, 0);
         area.replaceText(0, cutOffset, "");
+        ensureLineNoWidth();
     }
 
     public void replaceText(int start, int end, String text) {
