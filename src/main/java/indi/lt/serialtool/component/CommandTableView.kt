@@ -106,6 +106,9 @@ class CommandTableView : TableView<CommandItem?>(FXCollections.observableArrayLi
                 private val enableCheck = CheckBox()
                 private val box = HBox(5.0, intervalField, unitLabel, enableCheck)
 
+                private var checkListener: javafx.beans.value.ChangeListener<Boolean>? = null
+                private var intervalListener: javafx.beans.value.ChangeListener<String>? = null
+
                 init {
                     unitLabel.minWidth = USE_PREF_SIZE
                     box.alignment = Pos.CENTER_LEFT
@@ -122,23 +125,30 @@ class CommandTableView : TableView<CommandItem?>(FXCollections.observableArrayLi
                 }
 
                 override fun updateItem(item: CommandItem?, empty: Boolean) {
+                    // 先移除旧 listener，防止 TableView Cell 复用时 listener 堆积
+                    checkListener?.let { enableCheck.selectedProperty().removeListener(it) }
+                    intervalListener?.let { intervalField.textProperty().removeListener(it) }
+                    checkListener = null
+                    intervalListener = null
+
                     super.updateItem(item, empty)
                     if (empty || item == null) {
                         graphic = null
                     } else {
+                        // 先设值，再绑 listener，避免设值时触发 listener 扰乱其他 item
                         intervalField.text = item.getInterval().toString()
                         enableCheck.isSelected = item.isScheduled()
 
-                        intervalField.textProperty()
-                            .addListener { _: ObservableValue<out String>?, ov: String?, nv: String ->
-                                if (nv.isNotEmpty()) {
-                                    item.setInterval(nv.toInt())
-                                }
+                        checkListener = javafx.beans.value.ChangeListener { _, _, nv ->
+                            item.setScheduled(nv)
+                        }
+                        intervalListener = javafx.beans.value.ChangeListener { _, _, nv ->
+                            if (nv.isNotEmpty()) {
+                                item.setInterval(nv.toInt())
                             }
-                        enableCheck.selectedProperty()
-                            .addListener { o: ObservableValue<out Boolean>?, ov: Boolean?, nv: Boolean ->
-                                item.setScheduled(nv)
-                            }
+                        }
+                        enableCheck.selectedProperty().addListener(checkListener)
+                        intervalField.textProperty().addListener(intervalListener)
 
                         graphic = box
                     }
