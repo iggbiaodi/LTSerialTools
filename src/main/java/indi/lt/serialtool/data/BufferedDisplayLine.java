@@ -4,7 +4,6 @@ import indi.lt.serialtool.constant.MessageDirection;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * 接收区中的一行结构化日志。
@@ -30,8 +29,7 @@ public final class BufferedDisplayLine {
         this.dataType = dataType == null ? DataType.TXT : dataType;
         this.messageDirection = messageDirection;
         this.messageText = messageText == null ? "" : messageText;
-        this.searchableText = (this.timestampText + " " + this.dataType.name() + " " + this.messageText)
-                .toLowerCase(Locale.ROOT);
+        this.searchableText = this.timestampText + " " + this.dataType.name() + " " + this.messageText;
         this.byteSize = (this.timestampText + this.dataType.name() + this.messageText + '\n')
                 .getBytes(StandardCharsets.UTF_8).length;
     }

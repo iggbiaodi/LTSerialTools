@@ -31,7 +31,6 @@ import org.apache.logging.log4j.Logger
 import java.io.FileWriter
 import java.io.IOException
 import java.net.URL
-import java.util.Locale
 import java.util.ResourceBundle
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
@@ -660,7 +659,7 @@ class SerialReceiveCtrl : Initializable {
         val parts = rawKeywords.split("\\|".toRegex())
         val keywords = ArrayList<String>(parts.size)
         for (part in parts) {
-            val keyword = part.trim().lowercase(Locale.ROOT)
+            val keyword = part.trim()
             if (keyword.isNotEmpty()) {
                 keywords.add(keyword)
             }
