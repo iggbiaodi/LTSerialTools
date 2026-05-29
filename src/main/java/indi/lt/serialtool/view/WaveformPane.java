@@ -75,16 +75,16 @@ public class WaveformPane extends BorderPane {
     private static final double MAX_X_ZOOM_FACTOR = 20.0;
     private static final double MIN_Y_ZOOM_FACTOR = 0.1;
     private static final double MAX_Y_ZOOM_FACTOR = 20.0;
-    private static final double WAVEFORM_STROKE_WIDTH = 1.2;
+    private static final double WAVEFORM_STROKE_WIDTH = 1.0;
     private static final String[] SERIES_COLORS = {
-            "#f3622d",
-            "#fba71b",
-            "#57b757",
-            "#41a9c9",
-            "#4258c9",
-            "#9a42c8",
+            "#ff0808",
+            "#359e4d",
+            "#0e06ea",
+            "#ff8000",
+            "#ec68e1",
+            "#070307",
             "#c84164",
-            "#888888"
+            "#aaaaaa"
     };
 
     private final Label lbSerialName = new Label("串口:");
@@ -207,10 +207,17 @@ public class WaveformPane extends BorderPane {
         lineChart.setCreateSymbols(false);
         lineChart.setLegendVisible(false);
         lineChart.setHorizontalGridLinesVisible(true);
-        lineChart.setVerticalGridLinesVisible(true);
+        lineChart.setVerticalGridLinesVisible(false);
         lineChart.setTitle("实时波形图");
         lineChart.setMinHeight(320);
         lineChart.setFocusTraversable(true);
+
+        // 图表入场景后，强设网格线样式（避免被主题 CSS 覆盖）
+        lineChart.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                Platform.runLater(() -> applyGridLineStyle());
+            }
+        });
 
         legendBox.setPadding(new Insets(8, 0, 0, 0));
 
@@ -726,6 +733,7 @@ public class WaveformPane extends BorderPane {
 
         updateYAxis(lowerX, upperX);
         updateTimeline(windowPointCount, maxStart);
+        updateTickUnits();
         lbViewInfo.setText(
                 "显示窗口: " + windowPointCount + " 点  X缩放:" + formatZoomText(xZoomFactor)
                         + "  Y缩放:" + formatZoomText(yZoomFactor)
@@ -806,6 +814,60 @@ public class WaveformPane extends BorderPane {
         yAxis.setUpperBound(1);
     }
 
+    /**
+     * 根据当前可见范围动态设置坐标轴刻度间距，保持网格线稀疏（约5~8条）。
+     */
+    private void updateTickUnits() {
+        double xRange = xAxis.getUpperBound() - xAxis.getLowerBound();
+        double yRange = yAxis.getUpperBound() - yAxis.getLowerBound();
+
+        if (xRange > 0) {
+            xAxis.setTickUnit(niceTick(xRange, 6));
+        }
+        if (yRange > 0) {
+            yAxis.setTickUnit(niceTick(yRange, 6));
+        }
+    }
+
+    /**
+     * 计算一个"好看"的刻度间距，目标约 targetTicks 条网格线。
+     */
+    private static double niceTick(double range, int targetTicks) {
+        double raw = range / targetTicks;
+        double exp = Math.pow(10, Math.floor(Math.log10(raw)));
+        double mantissa = raw / exp;
+        double nice;
+        if (mantissa <= 1.5) {
+            nice = 1.0;
+        } else if (mantissa <= 3.5) {
+            nice = 2.0;
+        } else if (mantissa <= 7.5) {
+            nice = 5.0;
+        } else {
+            nice = 10.0;
+        }
+        return nice * exp;
+    }
+
+    /**
+     * 通过 lookup 直接设置网格线样式，确保不被主题 CSS 覆盖。
+     */
+    private void applyGridLineStyle() {
+        // 图表背景
+        Node bg = lineChart.lookup(".chart-plot-background");
+        if (bg != null) {
+            bg.setStyle("-fx-background-color: #f8f8f8;");
+        }
+        // 水平网格线
+        for (Node node : lineChart.lookupAll(".chart-horizontal-grid-lines")) {
+            node.setStyle("-fx-stroke: #e8e8e8; -fx-stroke-width: 0.5;");
+        }
+        // 垂直网格线（虽然已关闭，但以防残留）
+        for (Node node : lineChart.lookupAll(".chart-vertical-grid-lines")) {
+            node.setStyle("-fx-stroke: #e8e8e8; -fx-stroke-width: 0.5;");
+        }
+    }
+
     private String formatZoomText(double factor) {
         return String.format("%.2f", 1.0 / factor) + "x";
     }
@@ -845,7 +907,13 @@ public class WaveformPane extends BorderPane {
             Platform.runLater(() -> applySeriesLineStyle(series));
             return;
         }
-        lineNode.setStyle("-fx-stroke-width: " + WAVEFORM_STROKE_WIDTH + "px;");
+        int idx = waveformSeries.indexOf(series);
+        String color = getSeriesColor(idx);
+        lineNode.setStyle("-fx-stroke: " + color + "; -fx-stroke-width: " + WAVEFORM_STROKE_WIDTH + "px;"
+                + " -fx-stroke-line-cap: round; -fx-stroke-line-join: round;");
+        if (lineNode instanceof javafx.scene.shape.Path) {
+            ((javafx.scene.shape.Path) lineNode).setSmooth(true);
+        }
     }
 
     private String formatWaveValue(double value) {
