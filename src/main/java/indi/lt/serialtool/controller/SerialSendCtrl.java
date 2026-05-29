@@ -307,10 +307,15 @@ public class SerialSendCtrl implements Initializable {
                     true
             );
             serialReadService.start();
+            // 如果定时发送已勾选，自动启动发送
+            if (btnScheduleSend.isSelected() && (serialSenderService == null || !serialSenderService.isRunning())) {
+                startSendCommand();
+            }
         });
         cbSerialList.setOnOpenFailed(() -> {
             btnOpenSerial.setDisable(false);
             btnOpenSerial.setSelected(false);
+            btnScheduleSend.setSelected(false);
         });
     }
 
@@ -375,6 +380,10 @@ public class SerialSendCtrl implements Initializable {
      * 关闭串口
      */
     public void closeSerial() {
+        // 定时发送跟随串口关闭
+        if (btnScheduleSend.isSelected()) {
+            btnScheduleSend.setSelected(false);
+        }
         if (cbSerialList.getSelectedPort() != null && cbSerialList.getSelectedPort().isOpen()) {
             cbSerialList.getSelectedPort().closePort();
             LOG.info("串口已关闭");
@@ -436,8 +445,9 @@ public class SerialSendCtrl implements Initializable {
 
     private void startSendCommand() {
         if (cbSerialList.getSelectedPort() == null || !cbSerialList.getSelectedPort().isOpen()) {
-            ToastQueue.show(AppState.getStage(), "串口未打开", 800);
-            btnScheduleSend.setSelected(false);
+            // 串口未打开 → 自动打开，打开成功后会自动启动定时发送
+            cbSerialList.openSelectedSerial();
+            btnOpenSerial.setSelected(true);
             return;
         }
 
