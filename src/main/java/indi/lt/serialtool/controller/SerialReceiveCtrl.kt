@@ -267,7 +267,29 @@ class SerialReceiveCtrl : Initializable {
 
     @FXML
     private fun saveFilterLogs() {
-        logger.info("saveFilterLogs")
+        val content = textAreaFilter.text
+        if (content.isNullOrEmpty()) {
+            logger.info("没有过滤日志可保存")
+            return
+        }
+
+        val fileChooser = FileChooser().apply {
+            title = "保存过滤日志文件"
+            extensionFilters.addAll(
+                FileChooser.ExtensionFilter("文本文件", "*.txt"),
+                FileChooser.ExtensionFilter("所有文件", "*.*")
+            )
+        }
+
+        val file = fileChooser.showSaveDialog(textAreaFilter.scene.window) ?: return
+        try {
+            FileWriter(file, false).use { writer ->
+                writer.write(content)
+                logger.info("过滤日志已保存到: ${file.absolutePath}")
+            }
+        } catch (e: IOException) {
+            logger.error("保存过滤日志失败", e)
+        }
     }
 
     fun initSerialComboBoxAction() {
