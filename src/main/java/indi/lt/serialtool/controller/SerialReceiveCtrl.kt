@@ -330,10 +330,8 @@ class SerialReceiveCtrl : Initializable {
         pendingDisplayLines.clear()
         filterRebuildVersion.incrementAndGet()
         filterRebuildDirty.set(false)
-        originBuffer.clear()
-        filterBuffer.clear()
-        textAreaOrigin.setText("")
-        textAreaFilter.setText("")
+        textAreaOrigin.setAutoScroll(true)
+        textAreaFilter.setAutoScroll(true)
         textAreaOrigin.setAutoScroll(true)
         textAreaFilter.setAutoScroll(true)
         lbRecvBytes.text = "0 B"
