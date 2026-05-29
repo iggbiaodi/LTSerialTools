@@ -26,6 +26,7 @@ import javafx.scene.layout.BorderPane
 import javafx.scene.layout.HBox
 import javafx.stage.FileChooser
 import javafx.util.Callback
+import javafx.util.StringConverter
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import java.io.FileWriter
@@ -208,7 +209,7 @@ class SerialReceiveCtrl : Initializable {
                 serialPortSettings = settings
                 ConfigManager.putObject(serialSettingsKey(), settings)
                 cbSerialList.setSerialPortSettings(settings)
-                cbBautRateList.selectionModel.select(settings.baudRate)
+                cbBautRateList.value = settings.baudRate
                 UIUtil.showToast("串口参数已更新")
             }
         } catch (e: Exception) {
@@ -491,8 +492,13 @@ class SerialReceiveCtrl : Initializable {
             1200, 2400, 4800, 9600, 38400, 57600, 115200, 230400, 1500000, 2000000, 3000000
         )
         cbBautRateList.items = baudRates
+        cbBautRateList.converter = object : StringConverter<Int>() {
+            override fun toString(value: Int?): String = value?.toString() ?: ""
+            override fun fromString(string: String?): Int {
+                return string?.trim()?.toIntOrNull() ?: serialPortSettings.baudRate
+            }
+        }
         val baudRate = serialPortSettings.baudRate
-        cbBautRateList.selectionModel.select(baudRate)
         cbBautRateList.value = baudRate
     }
 

@@ -41,6 +41,7 @@ import javafx.scene.control.ToolBar;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.util.StringConverter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -201,8 +202,26 @@ public class SerialSendCtrl implements Initializable {
         List<Integer> baudRates = Arrays.asList(1200, 2400, 4800, 9600, 38400, 57600, 115200, 230400, DEFAULT_BAUTRATE, 2000000, 3000000);
         cbBautrate.getItems().clear();
         cbBautrate.getItems().addAll(baudRates);
+        cbBautrate.setEditable(true);
+        cbBautrate.setConverter(new StringConverter<Integer>() {
+            @Override
+            public String toString(Integer value) {
+                return value == null ? "" : value.toString();
+            }
+            @Override
+            public Integer fromString(String string) {
+                if (string == null || string.trim().isEmpty()) {
+                    return serialPortSettings.getBaudRate();
+                }
+                try {
+                    return Integer.parseInt(string.trim());
+                } catch (NumberFormatException e) {
+                    return serialPortSettings.getBaudRate();
+                }
+            }
+        });
         int baudRate = serialPortSettings != null ? serialPortSettings.getBaudRate() : DEFAULT_BAUTRATE;
-        cbBautrate.getSelectionModel().select(Integer.valueOf(baudRate));
+        cbBautrate.setValue(baudRate);
     }
 
     /**
@@ -363,8 +382,8 @@ public class SerialSendCtrl implements Initializable {
                 // 应用设置到串口组件
                 cbSerialList.setSerialPortSettings(settings);
 
-                // 同步波特率到主界面下拉框（如果设置中有指定波特率）
-                cbBautrate.getSelectionModel().select(Integer.valueOf(settings.getBaudRate()));
+                // 同步波特率到主界面下拉框
+                cbBautrate.setValue(settings.getBaudRate());
 
                 // 显示成功提示
                 ToastQueue.show(AppState.getStage(), "串口参数已更新", 800);
