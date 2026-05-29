@@ -29,18 +29,28 @@ import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.ToolBar;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.util.StringConverter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -193,6 +203,26 @@ public class SerialSendCtrl implements Initializable {
 
         // 启动时默认打开第一个串口
         // cbSerialList.openSelectedSerial();
+
+        // 表格右键菜单：编辑 / 删除
+        ContextMenu tableContextMenu = new ContextMenu();
+        MenuItem editItem = new MenuItem("编辑");
+        editItem.setOnAction(e -> {
+            CommandTableView.CommandItem selected = table.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                editCommand(selected);
+            }
+        });
+        MenuItem deleteItem = new MenuItem("删除");
+        deleteItem.setOnAction(e -> {
+            CommandTableView.CommandItem selected = table.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                table.getItems().remove(selected);
+                CommandRepository.INSTANCE.remove(selected);
+            }
+        });
+        tableContextMenu.getItems().addAll(editItem, deleteItem);
+        table.setContextMenu(tableContextMenu);
     }
 
     /**
@@ -500,6 +530,80 @@ public class SerialSendCtrl implements Initializable {
         table.getItems().add(item);
         attachCommandPersistence(item);
         CommandRepository.INSTANCE.add(item);
+    }
+
+    /**
+     * 编辑指定指令：弹出对话框修改备注、指令内容、指令类型
+     */
+    private void editCommand(CommandTableView.CommandItem item) {
+        // 创建对话框内容
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(10, 10, 10, 10));
+
+        // 设置列约束：第0列（标签）优先计算宽度，第1列（输入控件）占据剩余空间
+        ColumnConstraints col0 = new ColumnConstraints();
+        col0.setMinWidth(Region.USE_PREF_SIZE);
+        col0.setPrefWidth(Region.USE_COMPUTED_SIZE);
+        col0.setMaxWidth(Region.USE_PREF_SIZE);
+        col0.setHgrow(Priority.NEVER);
+
+        ColumnConstraints col1 = new ColumnConstraints();
+        col1.setMinWidth(200);
+        col1.setPrefWidth(400);
+        col1.setMaxWidth(Double.MAX_VALUE);
+        col1.setHgrow(Priority.ALWAYS);
+
+        grid.getColumnConstraints().addAll(col0, col1);
+
+        Label remarkLabel = new Label("备注:");
+        TextField remarkField = new TextField(item.getRemark());
+        Label commandLabel = new Label("指令内容:");
+        TextArea commandArea = new TextArea(item.getCommand());
+        commandArea.setPrefRowCount(3);
+        Label typeLabel = new Label("指令类型:");
+        ToggleButton hexToggle = new ToggleButton("HEX");
+        ToggleButton txtToggle = new ToggleButton("TXT");
+        ToggleGroup typeGroup = new ToggleGroup();
+        hexToggle.setToggleGroup(typeGroup);
+        txtToggle.setToggleGroup(typeGroup);
+        HBox typeBox = new HBox(5, hexToggle, txtToggle);
+        typeBox.setAlignment(Pos.CENTER_LEFT);
+
+        // 初始化类型选择
+        if ("HEX".equals(item.getCommandType())) {
+            hexToggle.setSelected(true);
+        } else {
+            txtToggle.setSelected(true);
+        }
+
+        grid.add(remarkLabel, 0, 0);
+        grid.add(remarkField, 1, 0);
+        grid.add(commandLabel, 0, 1);
+        grid.add(commandArea, 1, 1);
+        grid.add(typeLabel, 0, 2);
+        grid.add(typeBox, 1, 2);
+
+        // 创建对话框
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("编辑指令");
+        dialog.setHeaderText("修改指令内容");
+        dialog.getDialogPane().setContent(grid);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        dialog.setResizable(true);
+
+        // 自动聚焦到指令内容
+        Platform.runLater(() -> commandArea.requestFocus());
+
+        dialog.showAndWait().ifPresent(btn -> {
+            if (btn == ButtonType.OK) {
+                item.setRemark(remarkField.getText());
+                item.setCommand(commandArea.getText());
+                item.setCommandType(hexToggle.isSelected() ? "HEX" : "TXT");
+                persistCommandTable();
+            }
+        });
     }
 
     private void attachCommandPersistence(CommandTableView.CommandItem item) {
