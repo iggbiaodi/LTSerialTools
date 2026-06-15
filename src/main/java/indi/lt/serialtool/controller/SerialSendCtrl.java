@@ -742,7 +742,7 @@ public class SerialSendCtrl implements Initializable {
      */
     @FXML
     private void restoreScrolling() {
-        taRecvArea.setAutoScroll(true);
+        taRecvArea.restoreAutoScrollToEnd();
     }
 
     @FXML

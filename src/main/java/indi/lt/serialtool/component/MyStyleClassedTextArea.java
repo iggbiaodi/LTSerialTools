@@ -224,6 +224,9 @@ public class MyStyleClassedTextArea extends StackPane {
         appendStyledText(line.getMessageText(), null);
         appendStyledText("\n", null);
         ensureLineNoWidth();
+        if (autoScroll.get()) {
+            moveToEnd();
+        }
     }
 
 
@@ -303,7 +306,6 @@ public class MyStyleClassedTextArea extends StackPane {
 
     public void restoreAutoScrollToEnd() {
         setAutoScroll(true);
-        moveToEnd();
         Platform.runLater(this::moveToEnd);
     }
 
