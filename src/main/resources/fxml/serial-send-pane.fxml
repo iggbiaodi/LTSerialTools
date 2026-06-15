@@ -15,7 +15,6 @@
                                 <Button mnemonicParsing="false" text="恢复自动滚动" onAction="#restoreScrolling"/>
                                 <Button mnemonicParsing="false" text="清空接收" onAction="#clearLogs"/>
                                 <Region HBox.hgrow="ALWAYS"/>
-                                <ToggleButton fx:id="tgWindowMode" mnemonicParsing="false" text="独立窗口打开"/>
                             </children>
                         </HBox>
                         <MyStyleClassedTextArea fx:id="taRecvArea" prefHeight="200.0" prefWidth="200.0"

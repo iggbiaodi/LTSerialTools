@@ -33,7 +33,7 @@ public class MyStyleClassedTextArea extends StackPane {
     private static final String FONT_STYLE_KEY = "app.font.promptAreaStyle";
     private static final String LOG_META_STYLE_CLASS = "log-meta-text";
     private static final double EPS = 1e-3;
-    private static final Pattern PLAIN_META_PATTERN = Pattern.compile("(?m)^(\\[[^\\]\\r\\n]+\\]\\s*)+");
+    private static final Pattern PLAIN_META_PATTERN = Pattern.compile("(?m)^(\\[[^]\\r\\n]+]\\s*)+");
 
     private final StyleClassedTextArea area = new StyleClassedTextArea();
     private final VirtualizedScrollPane<StyleClassedTextArea> vsPane;

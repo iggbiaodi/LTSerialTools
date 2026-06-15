@@ -21,7 +21,7 @@ import indi.lt.serialtool.service.SerialReadService;
 import indi.lt.serialtool.service.SerialSenderService;
 import indi.lt.serialtool.utils.StringUtil;
 import indi.lt.serialtool.utils.UIUtil;
-import indi.lt.serialtool.view.BaseStage;
+
 import indi.lt.serialtool.view.SerialSendPane;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -42,14 +42,14 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
-import javafx.scene.control.ToolBar;
+
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
+
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.util.StringConverter;
@@ -82,7 +82,6 @@ public class SerialSendCtrl implements Initializable {
      */
     @FXML
     public CheckBox lineBreak;
-    public ToggleButton tgWindowMode;
     public SerialToggleButton btnScheduleSend;
 
     @FXML
@@ -120,8 +119,6 @@ public class SerialSendCtrl implements Initializable {
 
     private final CommandTableView table = new CommandTableView();
     private final Set<String> commandPersistenceBoundIds = new HashSet<>();
-
-    private BaseStage currStage;
 
     private SerialSenderService serialSenderService;
     private SerialReadService serialReadService;
@@ -170,29 +167,6 @@ public class SerialSendCtrl implements Initializable {
         setupButtonActions();
         restoreFormState();
         bindFormStatePersistence();
-
-        // 切换独立窗口
-        tgWindowMode.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            if (newValue) {
-                BaseStage baseStage = new BaseStage();
-                currStage = baseStage;
-                ToolBar toolBar = new ToolBar();
-                toolBar.setMinHeight(40);
-                VBox.setVgrow(rootPane, Priority.ALWAYS);
-                baseStage.registryDragger(toolBar);
-                rootPane.setVisible(false);
-                baseStage.setContentView(new VBox(toolBar, rootPane));
-                // baseStage.setSize(rootPane.getWidth(), rootPane.getHeight() + 40);
-                Platform.runLater(() -> {
-                    baseStage.show();
-                    rootPane.setVisible(true);
-                });
-            } else {
-                // TODO
-                currStage.close();
-            }
-        });
-
 
         // 定时发送
         btnScheduleSend.selectedProperty().addListener((observable, oldValue, newValue) -> {
@@ -731,10 +705,6 @@ public class SerialSendCtrl implements Initializable {
             serialSenderService.cancel();
         }
         closeSerial();
-        if (currStage != null) {
-            currStage.close();
-            currStage = null;
-        }
     }
 
     /**

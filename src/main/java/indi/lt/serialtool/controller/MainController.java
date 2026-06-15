@@ -10,6 +10,7 @@ import indi.lt.serialtool.service.AutoSaveService;
 import indi.lt.serialtool.utils.ZipUtil;
 import indi.lt.serialtool.utils.UIUtil;
 import indi.lt.serialtool.view.AsciiStage;
+import indi.lt.serialtool.view.BaseStage;
 import indi.lt.serialtool.view.SerialReceivePane;
 import indi.lt.serialtool.view.SerialSendPane;
 import indi.lt.serialtool.view.WaveformPane;
@@ -105,6 +106,8 @@ public class MainController implements Initializable {
     private Theme currentTheme;
     private final List<SerialReceivePane> receivePanes = new ArrayList<>();
     private final Map<Tab, Runnable> tabCloseActions = new HashMap<>();
+    private final Map<Tab, BaseStage> detachedWindows = new HashMap<>();
+    private final Map<BaseStage, Node> detachedContents = new HashMap<>();
     private TabPane leftSplitTabPane;
     private TabPane rightSplitTabPane;
     private int receivePaneIndex = 2;
@@ -168,17 +171,37 @@ public class MainController implements Initializable {
         MenuItem cancelSplitItem = new MenuItem("取消拆分");
         cancelSplitItem.setOnAction(event -> moveTabToMain(tab));
 
-        ContextMenu contextMenu = new ContextMenu(splitLeftItem, splitRightItem, cancelSplitItem);
+        MenuItem openWindowItem = new MenuItem("独立窗口打开");
+        openWindowItem.setOnAction(event -> openTabInWindow(tab));
+
+        MenuItem returnToTabItem = new MenuItem("回到标签页");
+        returnToTabItem.setOnAction(event -> returnTabToPane(tab));
+
+        ContextMenu contextMenu = new ContextMenu(
+                splitLeftItem, splitRightItem, cancelSplitItem,
+                new SeparatorMenuItem(),
+                openWindowItem, returnToTabItem
+        );
         contextMenu.setOnShowing(event -> {
             TabPane owner = tab.getTabPane();
             splitLeftItem.setDisable(owner == null || owner == leftSplitTabPane);
             splitRightItem.setDisable(owner == null || owner == rightSplitTabPane);
             cancelSplitItem.setDisable(owner == null || owner == tabRootPane);
+            boolean isDetached = detachedWindows.containsKey(tab);
+            openWindowItem.setVisible(!isDetached);
+            returnToTabItem.setVisible(isDetached);
         });
         return contextMenu;
     }
 
     private void handleTabClosed(Tab tab) {
+        BaseStage detachedStage = detachedWindows.remove(tab);
+        if (detachedStage != null) {
+            detachedContents.remove(detachedStage);
+            if (detachedStage.getStage().isShowing()) {
+                detachedStage.getStage().hide();
+            }
+        }
         Runnable closeAction = tabCloseActions.remove(tab);
         if (closeAction != null) {
             closeAction.run();
@@ -218,6 +241,47 @@ public class MainController implements Initializable {
 
         cleanupEmptySplitTabPanes();
         refreshSplitLayout();
+    }
+
+    private void openTabInWindow(Tab tab) {
+        if (detachedWindows.containsKey(tab)) {
+            return;
+        }
+        Node content = tab.getContent();
+        if (content == null) {
+            return;
+        }
+        tab.setContent(new Label("已独立打开 - 右键标签页可回到标签页"));
+
+        BaseStage baseStage = new BaseStage();
+        ToolBar toolBar = new ToolBar();
+        toolBar.setMinHeight(40);
+        baseStage.registryDragger(toolBar);
+        VBox.setVgrow(content, Priority.ALWAYS);
+
+        String originalTitle = tab.getText();
+        baseStage.setTitle(originalTitle + " - LTSerialTool");
+        baseStage.setContentView(new VBox(toolBar, content));
+        baseStage.getStage().setOnHidden(event -> returnTabToPane(tab));
+
+        detachedWindows.put(tab, baseStage);
+        detachedContents.put(baseStage, content);
+
+        Platform.runLater(baseStage::show);
+    }
+
+    private void returnTabToPane(Tab tab) {
+        BaseStage baseStage = detachedWindows.remove(tab);
+        if (baseStage == null) {
+            return;
+        }
+        Node content = detachedContents.remove(baseStage);
+        if (content != null && tab.getTabPane() != null) {
+            tab.setContent(content);
+        }
+        if (baseStage.getStage().isShowing()) {
+            baseStage.getStage().hide();
+        }
     }
 
     private TabPane ensureSplitTabPane(SplitSide splitSide) {
