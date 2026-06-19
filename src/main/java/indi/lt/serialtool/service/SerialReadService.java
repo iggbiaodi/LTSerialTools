@@ -192,6 +192,9 @@ public class SerialReadService extends Service<Void> {
                             byteBuf.flip();
                             decodeBuffer(decoder, byteBuf, charBuf, lineBuf, false, receivedAtMillis, tracker);
                             byteBuf.compact();
+
+                            // 数据持续进来时，检查当前行是否已超时
+                            flushLineBufferByTimeout(lineBuf, tracker, System.currentTimeMillis());
                         }
 
                         previousHexDisplay = hexMode;
@@ -222,11 +225,15 @@ public class SerialReadService extends Service<Void> {
 
     private void flushLineBufferByTimeout(StringBuilder lineBuf,
                                           LineTimestampTracker tracker,
-                                          long fallbackMillis) {
+                                          long nowMillis) {
         if (lineTimeoutMs <= 0 || lineBuf.isEmpty() || hexDisplayProperty.get()) {
             return;
         }
-        emitLine(lineBuf.toString(), tracker.currentOrFallback(fallbackMillis));
+        long lineStart = tracker.currentOrFallback(nowMillis);
+        if (nowMillis - lineStart < lineTimeoutMs) {
+            return;
+        }
+        emitLine(lineBuf.toString(), tracker.currentOrFallback(nowMillis));
         lineBuf.setLength(0);
         tracker.reset();
     }
