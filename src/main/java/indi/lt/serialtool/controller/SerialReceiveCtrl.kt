@@ -237,7 +237,7 @@ class SerialReceiveCtrl : Initializable {
         highlighter?.resetTracking()
         serialReadService?.resetRecvBytesCount()
         recvBytesBase = 0L
-        lbRecvBytes.text = "0 B"
+        lbRecvBytes.text = formatBytes(0L)
         statusIndicator?.setNormal()
     }
 
@@ -724,10 +724,10 @@ class SerialReceiveCtrl : Initializable {
 
     private fun formatBytes(bytes: Long): String {
         return when {
-            bytes < 1024 -> "$bytes B"
-            bytes < 1024 * 1024 -> String.format("%.2f KB", bytes / 1024.0)
-            bytes < 1024 * 1024 * 1024 -> String.format("%.2f MB", bytes / (1024.0 * 1024.0))
-            else -> String.format("%.2f GB", bytes / (1024.0 * 1024.0 * 1024.0))
+            bytes < 1024 -> "${bytes}(0)B"
+            bytes < 1024 * 1024 -> String.format("%d(%.1fK)B", bytes, bytes / 1024.0)
+            bytes < 1024 * 1024 * 1024 -> String.format("%d(%.1fM)B", bytes, bytes / (1024.0 * 1024.0))
+            else -> String.format("%d(%.1fG)B", bytes, bytes / (1024.0 * 1024.0 * 1024.0))
         }
     }
 }
