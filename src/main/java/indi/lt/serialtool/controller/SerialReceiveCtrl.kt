@@ -95,6 +95,7 @@ class SerialReceiveCtrl : Initializable {
     private var keyLastSerial: String? = null
     private var serialPortSettings: SerialPortSettings = SerialPortSettings.createDefault()
     private var autoSaveService: AutoSaveService? = null
+    private var recvBytesBase: Long = 0L
 
     private val pendingDisplayLines = ConcurrentLinkedQueue<BufferedDisplayLine>()
     private val uiFlushQueued = AtomicBoolean(false)
@@ -235,6 +236,7 @@ class SerialReceiveCtrl : Initializable {
         textAreaFilter.setText("")
         highlighter?.resetTracking()
         serialReadService?.resetRecvBytesCount()
+        recvBytesBase = 0L
         lbRecvBytes.text = "0 B"
         statusIndicator?.setNormal()
     }
@@ -334,7 +336,6 @@ class SerialReceiveCtrl : Initializable {
         textAreaFilter.setAutoScroll(true)
         textAreaOrigin.setAutoScroll(true)
         textAreaFilter.setAutoScroll(true)
-        lbRecvBytes.text = "0 B"
         statusIndicator?.setNormal()
         highlighter?.setPatternText(tfKeyWord.text ?: "")
         highlighter?.resetTracking()
@@ -349,7 +350,7 @@ class SerialReceiveCtrl : Initializable {
             service.setInternalAppendEnabled(false)
             service.setOnRecvBytesChanged { bytes ->
                 Platform.runLater {
-                    lbRecvBytes.text = formatBytes(bytes)
+                    lbRecvBytes.text = formatBytes(recvBytesBase + bytes)
                 }
             }
             service.setOnDisplayLineReceived { line ->
@@ -398,6 +399,7 @@ class SerialReceiveCtrl : Initializable {
     }
 
     private fun closeSelectSerial() {
+        recvBytesBase += serialReadService?.getRecvBytesCount() ?: 0L
         serialReadService?.cancel()
         serialReadService = null
         autoSaveService?.flush()
