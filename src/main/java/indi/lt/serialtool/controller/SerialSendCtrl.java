@@ -76,6 +76,8 @@ public class SerialSendCtrl implements Initializable {
     private final Logger LOG = LogManager.getLogger(SerialSendCtrl.class);
 
     private static final int DEFAULT_BAUTRATE = 1500000;
+    /** 发送写超时（毫秒），超时后 writeBytes 返回实际写入字节数，不阻塞后续操作 */
+    private static final int SEND_TIMEOUT_MS = 100;
 
     /**
      * 自动换行
@@ -128,6 +130,9 @@ public class SerialSendCtrl implements Initializable {
     /** 待发送的单条指令（串口打开成功后自动发送） */
     private CommandTableView.CommandItem pendingSingleSend;
 
+    /** 发送写超时（毫秒），从配置加载 */
+    private int sendTimeoutMs = SEND_TIMEOUT_MS;
+
     // 保存上次串口选择的 key
     private final String keyLastSerial = "sendModeLastSerialPort";
 
@@ -144,6 +149,7 @@ public class SerialSendCtrl implements Initializable {
     private static final String KEY_REMARK = "sendMode.form.remark";
     private static final String KEY_COMMAND = "sendMode.form.command";
     private static final String KEY_COMMAND_HEX = "sendMode.form.commandHex";
+    private static final String KEY_SEND_TIMEOUT = "sendMode.form.sendTimeout";
 
     /**
      * 初始化串口参数设置
@@ -291,6 +297,7 @@ public class SerialSendCtrl implements Initializable {
         tfRemark.setText(ConfigManager.get(KEY_REMARK, ""));
         tfCommand.setText(ConfigManager.get(KEY_COMMAND, ""));
         cbIsHex.setSelected(ConfigManager.get(KEY_COMMAND_HEX, Boolean.class, false));
+        sendTimeoutMs = ConfigManager.get(KEY_SEND_TIMEOUT, Integer.class, SEND_TIMEOUT_MS);
     }
 
     private void bindFormStatePersistence() {
@@ -342,6 +349,10 @@ public class SerialSendCtrl implements Initializable {
 
         cbSerialList.setOnOpenSucceed(() -> {
             btnOpenSerial.setDisable(false);
+
+            // 应用发送超时到串口硬件层
+            applySendTimeout();
+
             serialReadService = new SerialReadService(
                     cbSerialList.getSelectedPort(),
                     taRecvArea,
@@ -423,6 +434,21 @@ public class SerialSendCtrl implements Initializable {
         } catch (Exception e) {
             LOG.error("显示串口设置对话框失败", e);
             ToastQueue.show(AppState.getStage(), "打开设置对话框失败", 1000);
+        }
+    }
+
+    /**
+     * 将发送超时应用到当前打开的串口硬件层
+     */
+    private void applySendTimeout() {
+        SerialPort port = cbSerialList.getSelectedPort();
+        if (port != null && port.isOpen()) {
+            port.setComPortTimeouts(
+                    SerialPort.TIMEOUT_WRITE_BLOCKING | SerialPort.TIMEOUT_READ_SEMI_BLOCKING,
+                    0,                // 读超时保持 0（半阻塞）
+                    sendTimeoutMs     // 写超时
+            );
+            LOG.info("发送超时已设置: {}ms", sendTimeoutMs);
         }
     }
 
@@ -511,7 +537,12 @@ public class SerialSendCtrl implements Initializable {
                 data = content.getBytes(StandardCharsets.UTF_8);
                 logText = content;
             }
-            cbSerialList.getSelectedPort().writeBytes(data, data.length);
+            int written = cbSerialList.getSelectedPort().writeBytes(data, data.length);
+            if (written != data.length) {
+                LOG.warn("发送超时: {}/{} 字节", written, data.length);
+                ToastQueue.show(AppState.getStage(),
+                        String.format("发送超时: %d/%d 字节", written, data.length), 1000);
+            }
             LOG.info("发送成功: {}", logText);
             String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"));
             BufferedDisplayLine line = BufferedDisplayLine.of(0L, ts, BufferedDisplayLine.DataType.TXT, MessageDirection.SEND, logText);
@@ -669,6 +700,7 @@ public class SerialSendCtrl implements Initializable {
         ConfigManager.put(KEY_REMARK, tfRemark.getText() == null ? "" : tfRemark.getText());
         ConfigManager.put(KEY_COMMAND, tfCommand.getText() == null ? "" : tfCommand.getText());
         ConfigManager.put(KEY_COMMAND_HEX, String.valueOf(cbIsHex.isSelected()));
+        ConfigManager.put(KEY_SEND_TIMEOUT, String.valueOf(sendTimeoutMs));
 
         Integer baudRate = cbBautrate.getValue();
         if (baudRate != null) {

@@ -93,8 +93,12 @@ public class SerialSenderService extends Service<BufferedDisplayLine> {
                             data = text.getBytes(StandardCharsets.UTF_8);
                         }
 
-                        serialPort.writeBytes(data, data.length);
-                        LOG.info("已发送: {}", currentCommand.getCommand());
+                        int written = serialPort.writeBytes(data, data.length);
+                        if (written != data.length) {
+                            LOG.warn("定时发送超时: {}/{} 字节, cmd={}", written, data.length, currentCommand.getCommand());
+                        } else {
+                            LOG.info("已发送: {}", currentCommand.getCommand());
+                        }
 
                         String logBody = cbHexDisplay.isSelected() ? StringUtil.bytesToHexString(data) : command;
                         BufferedDisplayLine.DataType dataType;
