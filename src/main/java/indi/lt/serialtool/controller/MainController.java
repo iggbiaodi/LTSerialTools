@@ -4,6 +4,7 @@ import github.nonoas.jfx.flat.ui.theme.Theme;
 import indi.lt.serialtool.component.CommandTableView;
 import indi.lt.serialtool.component.FontFamilyComboBox;
 import indi.lt.serialtool.component.ThemeComboBox;
+import indi.lt.serialtool.data.ZipDataProvider;
 import indi.lt.serialtool.global.ConfigManager;
 import indi.lt.serialtool.global.FontSettingsManager;
 import indi.lt.serialtool.service.AutoSaveService;
@@ -658,18 +659,32 @@ public class MainController implements Initializable {
 
     @FXML
     public void saveAsZip(ActionEvent actionEvent) {
-        // 收集所有接收面板的数据
-        List<String> allData = new ArrayList<>();
-        int paneIndex = 1;
-        for (SerialReceivePane pane : receivePanes) {
-            String data = pane.getController().getOriginData();
-            if (data != null && !data.isEmpty()) {
-                allData.add("=== 串口接收" + paneIndex + " ===\n" + data);
-            }
-            paneIndex++;
+        // 收集所有实现了 ZipDataProvider 的控制器数据
+        Map<String, String> allEntries = new LinkedHashMap<>();
+
+        // 发送模式
+        ZipDataProvider sendProvider = serialSendPane.getController();
+        if (sendProvider != null) {
+            allEntries.putAll(sendProvider.provideZipEntries());
         }
 
-        if (allData.isEmpty()) {
+        // 所有接收面板（包括动态添加的）
+        for (SerialReceivePane pane : receivePanes) {
+            ZipDataProvider provider = pane.getController();
+            if (provider != null) {
+                allEntries.putAll(provider.provideZipEntries());
+            }
+        }
+
+        // 过滤掉空内容
+        Map<String, String> entriesToSave = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : allEntries.entrySet()) {
+            if (entry.getValue() != null && !entry.getValue().isEmpty()) {
+                entriesToSave.put(entry.getKey(), entry.getValue());
+            }
+        }
+
+        if (entriesToSave.isEmpty()) {
             UIUtil.showToast("没有数据可保存");
             return;
         }
@@ -701,8 +716,7 @@ public class MainController implements Initializable {
                     partSizeMB = Integer.parseInt(sizeStr.replace("MB", ""));
                 }
 
-                String combinedData = String.join("\n\n", allData);
-                ZipUtil.saveToZip(combinedData, file, partSizeMB, "serial-data");
+                ZipUtil.saveEntriesToZip(entriesToSave, file, partSizeMB);
 
                 UIUtil.showToast("数据已保存到: " + file.getName());
             } catch (IOException e) {

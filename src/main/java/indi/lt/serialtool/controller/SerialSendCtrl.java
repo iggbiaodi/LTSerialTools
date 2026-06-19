@@ -4,54 +4,28 @@ import com.fazecast.jSerialComm.SerialPort;
 import github.nonoas.jfx.flat.ui.AppState;
 import github.nonoas.jfx.flat.ui.concurrent.TaskHandler;
 import github.nonoas.jfx.flat.ui.stage.ToastQueue;
-import indi.lt.serialtool.component.CommandTableView;
-import indi.lt.serialtool.component.InlineCssRegexHighlighter;
-import indi.lt.serialtool.component.MyStyleClassedTextArea;
-import indi.lt.serialtool.component.SerialPortCombBox;
-import indi.lt.serialtool.component.SerialToggleButton;
+import indi.lt.serialtool.component.*;
 import indi.lt.serialtool.constant.CommandType;
 import indi.lt.serialtool.constant.MessageDirection;
 import indi.lt.serialtool.data.BufferedDisplayLine;
 import indi.lt.serialtool.data.CommandRepository;
-import indi.lt.serialtool.data.LogText;
 import indi.lt.serialtool.data.SerialPortSettings;
+import indi.lt.serialtool.data.ZipDataProvider;
 import indi.lt.serialtool.global.ConfigManager;
 import indi.lt.serialtool.global.FontSettingsManager;
 import indi.lt.serialtool.service.SerialReadService;
 import indi.lt.serialtool.service.SerialSenderService;
 import indi.lt.serialtool.utils.StringUtil;
 import indi.lt.serialtool.utils.UIUtil;
-
 import indi.lt.serialtool.view.SerialSendPane;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
-import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.ContextMenu;
-import javafx.scene.control.Dialog;
-import javafx.scene.control.DialogPane;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.TableRow;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
-import javafx.scene.control.TextInputControl;
-import javafx.scene.control.ToggleButton;
-import javafx.scene.control.ToggleGroup;
-
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.ColumnConstraints;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
-
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
 import javafx.util.StringConverter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -60,18 +34,12 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.ResourceBundle;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * 串口发送控制器
  */
-public class SerialSendCtrl implements Initializable {
+public class SerialSendCtrl implements Initializable, ZipDataProvider {
 
     private final Logger LOG = LogManager.getLogger(SerialSendCtrl.class);
 
@@ -737,6 +705,20 @@ public class SerialSendCtrl implements Initializable {
             serialSenderService.cancel();
         }
         closeSerial();
+    }
+
+    @Override
+    public Map<String, String> provideZipEntries() {
+        Map<String, String> entries = new HashMap<>();
+        String recvData = taRecvArea.getText();
+        if (recvData != null && !recvData.isEmpty()) {
+            entries.put("发送模式接收", recvData);
+        }
+        String sendData = taSendArea.getText();
+        if (sendData != null && !sendData.isEmpty()) {
+            entries.put("发送模式发送区", sendData);
+        }
+        return entries;
     }
 
     /**

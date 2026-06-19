@@ -9,6 +9,7 @@ import indi.lt.serialtool.component.StatusIndicator
 import indi.lt.serialtool.data.BoundedDisplayBuffer
 import indi.lt.serialtool.data.BufferedDisplayLine
 import indi.lt.serialtool.data.SerialPortSettings
+import indi.lt.serialtool.data.ZipDataProvider
 import indi.lt.serialtool.global.ConfigManager
 import indi.lt.serialtool.global.FontSettingsManager
 import indi.lt.serialtool.service.AutoSaveService
@@ -42,7 +43,7 @@ import java.util.concurrent.atomic.AtomicLong
 /**
  * 接收模式逻辑
  */
-class SerialReceiveCtrl : Initializable {
+class SerialReceiveCtrl : Initializable, ZipDataProvider {
     private val logger: Logger = LogManager.getLogger(MainController::class.java)
 
     @FXML
@@ -485,6 +486,21 @@ class SerialReceiveCtrl : Initializable {
 
     fun getOriginData(): String {
         return textAreaOrigin.text ?: ""
+    }
+
+    override fun provideZipEntries(): Map<String, String> {
+        val entries = LinkedHashMap<String, String>()
+        val originData = textAreaOrigin.text
+        if (!originData.isNullOrEmpty()) {
+            val name = lbSerialName.text?.takeIf { it.isNotBlank() } ?: "接收模式"
+            entries[name] = originData
+        }
+        val filterData = textAreaFilter.text
+        if (!filterData.isNullOrEmpty()) {
+            val name = (lbSerialName.text?.takeIf { it.isNotBlank() } ?: "接收模式") + "_过滤窗口"
+            entries[name] = filterData
+        }
+        return entries
     }
 
     private fun initBautRateList() {

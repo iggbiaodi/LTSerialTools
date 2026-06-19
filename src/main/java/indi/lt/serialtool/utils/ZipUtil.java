@@ -2,6 +2,7 @@ package indi.lt.serialtool.utils;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -71,6 +72,55 @@ public class ZipUtil {
                 zos.putNextEntry(entry);
                 zos.write(dataArray[i].getBytes(StandardCharsets.UTF_8));
                 zos.closeEntry();
+            }
+        }
+    }
+
+    /**
+     * 将多个文本条目打包成ZIP，每个条目可独立分卷
+     *
+     * @param entries    数据条目，key 为条目名称（不含扩展名），value 为内容
+     * @param zipFile    目标ZIP文件
+     * @param partSizeMB 每个分卷的大小（MB）
+     * @throws IOException IO异常
+     */
+    public static void saveEntriesToZip(Map<String, String> entries, File zipFile, int partSizeMB) throws IOException {
+        if (entries == null || entries.isEmpty()) {
+            throw new IllegalArgumentException("数据不能为空");
+        }
+
+        long partSizeBytes = (long) partSizeMB * 1024 * 1024;
+
+        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zipFile), StandardCharsets.UTF_8)) {
+            for (Map.Entry<String, String> entry : entries.entrySet()) {
+                String name = entry.getKey();
+                String content = entry.getValue();
+                if (content == null || content.isEmpty()) {
+                    continue;
+                }
+
+                byte[] dataBytes = content.getBytes(StandardCharsets.UTF_8);
+                int totalParts = (int) Math.ceil((double) dataBytes.length / partSizeBytes);
+
+                for (int part = 0; part < totalParts; part++) {
+                    long start = (long) part * partSizeBytes;
+                    long end = Math.min(start + partSizeBytes, dataBytes.length);
+                    int length = (int) (end - start);
+
+                    String safeName = name.replaceAll("[<>:\"/\\\\|?*]", "_");
+
+                    String entryName;
+                    if (totalParts > 1) {
+                        entryName = safeName + "_part" + (part + 1) + "_of" + totalParts + ".txt";
+                    } else {
+                        entryName = safeName + ".txt";
+                    }
+
+                    ZipEntry zipEntry = new ZipEntry(entryName);
+                    zos.putNextEntry(zipEntry);
+                    zos.write(dataBytes, (int) start, length);
+                    zos.closeEntry();
+                }
             }
         }
     }
