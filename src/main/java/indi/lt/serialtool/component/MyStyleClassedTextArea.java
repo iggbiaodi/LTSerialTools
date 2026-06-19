@@ -18,6 +18,8 @@ import javafx.scene.control.ScrollBar;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.StackPane;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.fxmisc.flowless.VirtualizedScrollPane;
 import org.fxmisc.richtext.LineNumberFactory;
 import org.fxmisc.richtext.StyleClassedTextArea;
@@ -30,6 +32,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class MyStyleClassedTextArea extends StackPane {
+
+    public static final Logger LOGGER = LogManager.getLogger(MyStyleClassedTextArea.class.getName());
     private static final String FONT_STYLE_KEY = "app.font.promptAreaStyle";
     private static final String LOG_META_STYLE_CLASS = "log-meta-text";
     private static final double EPS = 1e-3;
@@ -43,7 +47,8 @@ public class MyStyleClassedTextArea extends StackPane {
     private ScrollBar verticalBar;
     private int maxLines = 500;
     private int lastLineNoDigits = 1;
-    private static final double DIGIT_CHAR_WIDTH = 8.0;
+    private int nextLineNoThreshold = 10;
+    private static final double DIGIT_CHAR_WIDTH = 10.0;
     private static final double LINE_NO_SIDE_PADDING = 10.0;
 
     public MyStyleClassedTextArea() {
@@ -70,6 +75,7 @@ public class MyStyleClassedTextArea extends StackPane {
             if (newValue == null || newValue.isEmpty()) {
                 area.setParagraphGraphicFactory(null);
                 lastLineNoDigits = 1;
+                nextLineNoThreshold = 10;
             } else if (area.getParagraphGraphicFactory() == null) {
                 configureLineNoFactory();
             }
@@ -114,7 +120,9 @@ public class MyStyleClassedTextArea extends StackPane {
         int total = area.getParagraphs().size();
         int digits = total <= 1 ? 1 : String.valueOf(total).length();
         lastLineNoDigits = digits;
+        nextLineNoThreshold = (int) Math.pow(10, digits);
         final double width = digits * DIGIT_CHAR_WIDTH + LINE_NO_SIDE_PADDING;
+        LOGGER.debug("configureLineNoFactory: width={}", width);
         area.setParagraphGraphicFactory(idx -> {
             Label label = new Label(String.valueOf(idx + 1));
             label.getStyleClass().add("lineno");
@@ -130,8 +138,7 @@ public class MyStyleClassedTextArea extends StackPane {
 
     private void ensureLineNoWidth() {
         int total = area.getParagraphs().size();
-        int digits = total <= 1 ? 1 : String.valueOf(total).length();
-        if (digits > lastLineNoDigits) {
+        if (total >= nextLineNoThreshold) {
             area.setParagraphGraphicFactory(null);
             configureLineNoFactory();
             area.requestLayout();
