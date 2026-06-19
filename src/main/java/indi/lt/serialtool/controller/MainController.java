@@ -57,6 +57,7 @@ import static org.kordamp.ikonli.material2.Material2OutlinedMZ.TUNE;
 
 public class MainController implements Initializable {
     private static final String KEY_AUTO_SAVE = "main.form.autoSave";
+    private static final String KEY_ZIP_SPLIT_SIZE = "main.zip.splitSize";
     private final Logger LOG = LogManager.getLogger(MainController.class);
 
     @FXML
@@ -408,7 +409,7 @@ public class MainController implements Initializable {
         FontSettingsManager.configureDialog(dialog);
 
         dialog.showAndWait().ifPresent(input -> {
-            String value = input == null ? "" : input.trim();
+            String value = input.trim();
             if (value.isEmpty()) {
                 return;
             }
@@ -700,14 +701,16 @@ public class MainController implements Initializable {
             return;
         }
 
-        // 选择分卷大小
-        ChoiceDialog<String> sizeDialog = new ChoiceDialog<>("10MB", "1MB", "5MB", "10MB", "50MB", "100MB", "不分卷");
+        // 选择分卷大小，默认不分卷，记录用户上次选择
+        String savedSize = ConfigManager.get(KEY_ZIP_SPLIT_SIZE, "不分卷");
+        ChoiceDialog<String> sizeDialog = new ChoiceDialog<>(savedSize, "1MB", "5MB", "10MB", "50MB", "100MB", "不分卷");
         sizeDialog.setTitle("设置分卷大小");
         sizeDialog.setHeaderText("选择每个分卷文件的大小");
         sizeDialog.setContentText("分卷大小:");
         FontSettingsManager.configureDialog(sizeDialog);
 
         sizeDialog.showAndWait().ifPresent(sizeStr -> {
+            ConfigManager.set(KEY_ZIP_SPLIT_SIZE, sizeStr);
             try {
                 int partSizeMB;
                 if ("不分卷".equals(sizeStr)) {
