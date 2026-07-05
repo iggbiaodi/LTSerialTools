@@ -11,9 +11,9 @@
                     <children>
                         <HBox alignment="CENTER_LEFT" spacing="10.0">
                             <children>
-                                <Label text="接收区："/>
+                                <Label text="显示区："/>
                                 <Button mnemonicParsing="false" text="恢复自动滚动" onAction="#restoreScrolling"/>
-                                <Button mnemonicParsing="false" text="清空接收" onAction="#clearLogs"/>
+                                <Button mnemonicParsing="false" text="清空显示" onAction="#clearLogs"/>
                                 <Region HBox.hgrow="ALWAYS"/>
                             </children>
                         </HBox>
