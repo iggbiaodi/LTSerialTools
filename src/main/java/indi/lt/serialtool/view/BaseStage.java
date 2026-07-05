@@ -1,10 +1,8 @@
 package indi.lt.serialtool.view;
 
 import github.nonoas.jfx.flat.ui.stage.AppStage;
-import javafx.scene.image.Image;
+import indi.lt.serialtool.global.FontSettingsManager;
 import javafx.stage.Stage;
-
-import java.util.Collections;
 
 /**
  * 程序通用窗口，设置了一系列通用的样式和参数
@@ -14,14 +12,28 @@ import java.util.Collections;
  */
 public class BaseStage extends AppStage {
 
-    protected final String TITLE = "WorkTools";
+    public static final String APP_NAME = "LTSerialTool";
+    public static final String APP_VERSION = "2.0.0";
+
+    protected final String TITLE = APP_NAME + "-v" + APP_VERSION;
 
     public BaseStage() {
         setTitle(TITLE);
         Stage stage = getStage(); // 如果没有 getStage()，请改为直接使用父类暴露的 stage 字段
         if (stage != null && stage.getScene() != null) {
-            stage.getScene().getStylesheets().addAll("css/style.css");
+            String stylesheet = FontSettingsManager.getAppStylesheetUrl();
+            if (stylesheet != null && !stage.getScene().getStylesheets().contains(stylesheet)) {
+                stage.getScene().getStylesheets().add(stylesheet);
+            }
+            stage.getScene().rootProperty().addListener((obs, oldRoot, newRoot) -> {
+                if (newRoot != null) {
+                    FontSettingsManager.applyTo(newRoot);
+                }
+            });
+            if (stage.getScene().getRoot() != null) {
+                FontSettingsManager.applyTo(stage.getScene().getRoot());
+            }
         }
-        addIcons(Collections.singleton(new Image("image/logo.png")));
+        FontSettingsManager.applyAppIcon(getStage());
     }
 }

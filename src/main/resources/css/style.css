@@ -1,5 +1,6 @@
-.dialog-pane .content {
-    -fx-text-fill: #111;
+.root {
+    -fx-font-size: 12px;
+    -app-log-highlight-color: rgba(255, 241, 118, 0.45);
 }
 
 .sys-btn-box .button {
@@ -76,3 +77,113 @@
 .search-button-selected {
     -fx-background-color: -color-button-border-focused, -color-button-bg-hover;
 }
+
+/* 串口开关按钮 beg*/
+.serial-toggle-button {
+    -fx-background-color: -color-accent-emphasis;
+    -fx-text-fill: -color-button-fg-selected;
+}
+
+.serial-toggle-button:selected {
+    -fx-background-color: -color-danger-emphasis;
+    -fx-text-fill: -color-button-fg-selected;
+}
+
+/* 串口开关按钮 end*/
+.tab-pane *.tab-header-area *.tab {
+    -fx-pref-height: 40px;
+}
+
+/*=======================================================*/
+/*                   日志框样式      beg                   */
+/*=======================================================*/
+.prompt-text {
+    -fx-font-size: 12px;
+    -fx-text-fill: -color-fg-subtle;
+    -fx-padding: 2 4 2 4; /* 内边距：上右下左 */
+}
+
+/* 行号样式 */
+.lineno {
+    -fx-background-color: transparent;
+    -fx-border-color: -color-border-default;
+    -fx-border-width: 0 1px 0 0;
+    -fx-text-fill: -color-fg-subtle;
+    -fx-font-style: normal; /* 禁止斜体 */
+    -fx-font-weight: normal; /* 禁止加粗（可选） */
+    -fx-padding: 0 5 0 5;
+}
+.lineno-wrap {
+    -fx-padding: 0 8 0 0;
+}
+
+.styled-text-area {
+    -fx-background-color: -color-bg-default;
+    -fx-padding: 10;
+}
+
+.styled-text-area .paragraph-box .paragraph-text .text {
+    -fx-line-spacing: 2 !important;
+    -fx-fill: -color-fg-default;
+}
+
+.log-meta-text {
+    -fx-fill: -color-fg-subtle !important;
+}
+
+.keyword-highlight {
+    -rtfx-background-color: -app-log-highlight-color;
+    -fx-font-weight: bold;
+}
+
+/*=======================================================*/
+/*                   日志框样式          end                  */
+/*=======================================================*/
+
+
+/*===================================================*/
+/*               工具栏按钮   beg                 */
+/*===================================================*/
+/* 1. 移除 MenuButton 上的三角箭头并消除其占位空间 */
+/* 1. 移除箭头按钮本身 */
+.flat-menu-button > .arrow-button {
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+    -fx-shape: null; /* 去掉图形 */
+    -fx-min-width: 0;
+    -fx-pref-width: 0;
+    -fx-max-width: 0;
+}
+
+/* 2. 移除箭头图标 */
+.flat-menu-button > .arrow-button > .arrow {
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+    -fx-shape: null; /* 去掉默认的三角箭头 */
+    -fx-min-width: 0;
+    -fx-pref-width: 0;
+    -fx-max-width: 0;
+}
+
+/* 2. 扁平化 MenuButton 的基本样式 */
+.flat-menu-button {
+    /* 移除默认边框、背景阴影或高光，实现扁平化 */
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-background-insets: 0;
+}
+
+/* 3. 定义悬停 (Hover) 时的样式，使其在 ToolBar 中有反应 */
+.flat-menu-button:hover {
+    -fx-background-color: #e0e0e0; /* 悬停时显示浅灰色背景 */
+    -fx-cursor: hand;
+}
+
+/* 4. 定义按下 (Pressed) 时的样式 */
+.flat-menu-button:pressed {
+    -fx-background-color: #cccccc; /* 按下时显示深一点的灰色 */
+}
+
+/*===================================================*/
+/*               工具栏按钮   end                       */
+/*===================================================*/

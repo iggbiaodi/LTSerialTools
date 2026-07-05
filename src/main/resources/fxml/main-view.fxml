@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckMenuItem?>
+<?import javafx.scene.control.MenuButton?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.SeparatorMenuItem?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.ToolBar?>
+<?import javafx.scene.input.KeyCodeCombination?>
+<?import javafx.scene.layout.BorderPane?>
+
+<BorderPane fx:id="rootPane" prefHeight="656.0" prefWidth="670.0"
+            xmlns="http://javafx.com/javafx/17.0.2-ea"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="indi.lt.serialtool.controller.MainController">
+    <center>
+        <TabPane fx:id="tabRootPane" BorderPane.alignment="CENTER"/>
+    </center>
+    <left>
+        <ToolBar fx:id="toolBar" orientation="VERTICAL" BorderPane.alignment="CENTER">
+            <items>
+                <Button fx:id="mbNewTab" mnemonicParsing="false" onAction="#addNewTab"/>
+                <MenuButton fx:id="mbFile" mnemonicParsing="false">
+                    <items>
+                        <MenuItem fx:id="menuSaveAsZip" mnemonicParsing="false" onAction="#saveAsZip" text="保存为压缩包">
+                            <accelerator>
+                                <KeyCodeCombination alt="UP" code="S" control="DOWN" meta="UP" shift="UP" shortcut="UP"/>
+                            </accelerator>
+                        </MenuItem>
+                    </items>
+                </MenuButton>
+                <MenuButton fx:id="mbSetting" mnemonicParsing="false">
+                    <items>
+                        <CheckMenuItem fx:id="autoSaveCheck" mnemonicParsing="false" text="自动保存"/>
+                        <SeparatorMenuItem/>
+                        <MenuItem fx:id="menuAutoSaveInterval" mnemonicParsing="false" onAction="#setAutoSaveInterval" text="设置自动保存间隔时间"/>
+                        <MenuItem fx:id="menuAutoSaveFileSize" mnemonicParsing="false" onAction="#setAutoSaveFileSize" text="设置自动保存文件大小"/>
+                        <SeparatorMenuItem/>
+                        <MenuItem fx:id="menuBufferCapacity" mnemonicParsing="false" onAction="#setBufferCapacity" text="设置显示缓冲区容量"/>
+                        <SeparatorMenuItem/>
+                        <MenuItem fx:id="menuReceiveTimeout" mnemonicParsing="false" onAction="#setReceiveTimeout" text="设置接收超时时间"/>
+                    </items>
+                </MenuButton>
+                <MenuButton fx:id="mbAppearance" mnemonicParsing="false">
+                    <items>
+                        <MenuItem mnemonicParsing="false" onAction="#showAppearanceSettingsDialog" text="外观设置"/>
+                    </items>
+                </MenuButton>
+                <MenuButton fx:id="mbTools" mnemonicParsing="false">
+                    <items>
+                        <MenuItem mnemonicParsing="false" onAction="#openAsciiTable" text="ASCII码表"/>
+                    </items>
+                </MenuButton>
+                <MenuButton fx:id="mbHelp" mnemonicParsing="false">
+                    <items>
+                        <MenuItem mnemonicParsing="false" onAction="#showWaveformProtocolHelp" text="波形图协议"/>
+                        <MenuItem mnemonicParsing="false" onAction="#goToWebsite" text="前往官网"/>
+                        <MenuItem mnemonicParsing="false" text="投喂作者"/>
+                        <MenuItem mnemonicParsing="false" onAction="#showAboutDialog" text="关于"/>
+                    </items>
+                </MenuButton>
+            </items>
+        </ToolBar>
+    </left>
+</BorderPane>

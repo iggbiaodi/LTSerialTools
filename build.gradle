@@ -1,14 +1,28 @@
+import io.github.fvarrui.javapackager.gradle.PackageTask
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
+buildscript {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.github.fvarrui:javapackager:1.7.5'
+    }
+}
+
 plugins {
     id 'java'
     id 'application'
-    id 'org.javamodularity.moduleplugin' version '1.8.12'
-    id 'org.openjfx.javafxplugin' version '0.0.13'
-    id 'org.beryx.jlink' version '2.25.0'
-    id 'org.jetbrains.kotlin.jvm'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
+    id 'org.jetbrains.kotlin.jvm' version '2.1.0'
 }
 
+apply plugin: 'io.github.fvarrui.javapackager.plugin'
+
+
 group 'indi.lt.serialtool'
-version '1.0-SNAPSHOT'
+version '2.0.0'
 
 repositories {
     mavenLocal()
@@ -17,28 +31,65 @@ repositories {
 
 ext {
     junitVersion = '5.10.0'
+    versions = [
+            'jfx': '25.0.2'
+    ]
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(23)
+    }
+    sourceCompatibility = JavaVersion.VERSION_23
+    targetCompatibility = JavaVersion.VERSION_23
 }
 
 
-tasks.withType(JavaCompile) {
+kotlin {
+    jvmToolchain(23)
+}
+
+tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+tasks.withType(KotlinCompile).configureEach {
+    kotlinOptions {
+        jvmTarget = '23'
+    }
+}
+
+
 application {
-    mainClass = 'indi.lt.serialtool.SerialApplication'
+    mainClass = 'indi.lt.serialtool.Main'
+    applicationDefaultJvmArgs = ["--enable-preview", "-Djavafx.enablePreview=true"]
 }
 
 javafx {
-    version = '17.0.6'
-    modules = ['javafx.controls', 'javafx.fxml']
+    version = "${versions.jfx}"
+    modules = ['javafx.controls', 'javafx.fxml', 'javafx.graphics', 'javafx.swing']
 }
+
+def os = org.gradle.internal.os.OperatingSystem.current()
+def arch = System.getProperty("os.arch")
+def platform =
+        os.isWindows() ? "win" :
+                os.isMacOsX() ? (arch.contains("aarch64") || arch.contains("arm64") ? "mac-aarch64" : "mac") :
+                        /* linux */ (arch.contains("aarch64") || arch.contains("arm64") ? "linux-aarch64" : "linux")
 
 dependencies {
     implementation('org.kordamp.ikonli:ikonli-javafx:12.3.1')
-    implementation('io.github.nonoas:jfx-flat-ui:1.0.2')
+    implementation "org.kordamp.ikonli:ikonli-materialdesign2-pack:12.3.1"
+
+    implementation 'io.github.nonoas:jfx-flat-ui:2.0.0-SNAPSHOT'
     implementation('com.fazecast:jSerialComm:2.10.4')
     implementation('org.apache.logging.log4j:log4j-core:2.20.0')
+    implementation 'com.google.code.gson:gson:2.11.0'
+
     implementation 'com.h2database:h2:2.2.220'
+    implementation 'io.github.mkpaz:atlantafx-base:2.0.1'
+    implementation "org.fxmisc.richtext:richtextfx:0.11.7"
+
     testImplementation("org.junit.jupiter:junit-jupiter-api:${junitVersion}")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:${junitVersion}")
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
@@ -48,17 +99,33 @@ test {
     useJUnitPlatform()
 }
 
-jlink {
-    imageZip = project.file("${buildDir}/distributions/app-${javafx.platform.classifier}.zip")
-    options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
-    launcher {
-        name = 'app'
+jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes 'Main-Class': application.mainClass.get()
     }
 }
 
-jlinkZip {
-    group = 'distribution'
+tasks.register('packageMyApp', PackageTask) {
+    dependsOn clean, jar
+    // mandatory
+    mainClass = application.mainClass.get()
+    // optional
+    modules = ["java.base", "java.management", "java.net.http", "java.scripting", "java.sql",
+               "java.naming",
+               "jdk.jsobject", "jdk.unsupported", "jdk.unsupported.desktop", "jdk.xml.dom",
+               // 这个模块没有的话，访问不了https
+               "jdk.crypto.ec"
+    ]
+    vmArgs = [
+            "-Djavafx.enablePreview=true",
+            "--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED"
+    ]
+    bundleJre = true
+    generateInstaller = false
+    // 是否需要管理员权限
+    administratorRequired = false
+    winConfig { createZipball = true }
+
 }
-kotlin {
-    jvmToolchain(17)
-}
+

@@ -6,4 +6,25 @@ pluginManagement {
 plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '0.5.0'
 }
-rootProject.name = "SerialTool"
+
+dependencyResolutionManagement {
+    repositoriesMode = RepositoriesMode.PREFER_SETTINGS
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+
+        maven {
+            url = uri('https://central.sonatype.com/repository/maven-snapshots/')
+        }
+
+        maven {
+            url = uri('https://mirrors.huaweicloud.com/repository/maven/')
+        }
+
+        maven {
+            url = uri('https://maven.aliyun.com/repository/central')
+        }
+    }
+}
+rootProject.name = "serial-tool"

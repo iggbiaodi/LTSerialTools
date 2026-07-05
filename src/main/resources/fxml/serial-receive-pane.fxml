@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import indi.lt.serialtool.component.*?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<fx:root minWidth="0.0" type="StackPane" xmlns="http://javafx.com/javafx/17.0.12" xmlns:fx="http://javafx.com/fxml/1" fx:controller="indi.lt.serialtool.controller.SerialReceiveCtrl">
+    <children>
+        <VBox spacing="10.0">
+            <children>
+                <FlowPane hgap="20.0" vgap="10.0">
+                    <children>
+                        <HBox alignment="CENTER_LEFT" maxWidth="1.7976931348623157E308" spacing="10.0">
+                            <children>
+                                <Label fx:id="lbSerialName" minWidth="40.0" text="串口1:" />
+                                <SerialPortCombBox fx:id="cbSerialList" minWidth="200.0" prefWidth="200.0" HBox.hgrow="ALWAYS" />
+                                <SerialToggleButton fx:id="btnOpenSerial" minWidth="60.0" mnemonicParsing="false" text="打开" />
+                            </children>
+                        </HBox>
+                        <HBox alignment="CENTER_LEFT" maxWidth="1.7976931348623157E308" spacing="10.0">
+                            <children>
+                                <Label minWidth="42.0" text="波特率:" />
+                                <ComboBox fx:id="cbBautRateList" editable="true" minWidth="80.0" prefWidth="150.0" HBox.hgrow="ALWAYS" />
+                                <Button fx:id="btnMoreSettings" minWidth="80.0" mnemonicParsing="false" onAction="#showMoreSettings" text="更多设置" />
+                            </children>
+                        </HBox>
+                    </children>
+                </FlowPane>
+                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                    <children>
+                        <Label text="过滤关键字:" />
+                        <TextField fx:id="tfKeyWord" promptText="关键字以“|”隔开" />
+                        <CheckBox fx:id="cbHexDisplay" mnemonicParsing="false" text="HEX显示" />
+                        <CheckBox fx:id="cbTimeDisplay" mnemonicParsing="false" text="时间戳显示" />
+                        <CheckBox fx:id="cbHighlightKeyword" mnemonicParsing="false" prefHeight="17.0" prefWidth="100.0" text="高亮关键字" />
+                    </children>
+                </HBox>
+                <HBox spacing="10.0">
+                    <children>
+                        <Button fx:id="btnSaveOrigin" mnemonicParsing="false" onAction="#saveOriginLogs" styleClass="success" text="保存原始" />
+                        <Button fx:id="btnSaveFilter" mnemonicParsing="false" onAction="#saveFilterLogs" styleClass="success" text="保存过滤" />
+                        <Button mnemonicParsing="false" onAction="#restoreScrolling" text="恢复滚动" />
+                        <Button fx:id="btnClearRecvData" mnemonicParsing="false" onAction="#clearLogs" text="清空数据" />
+                    </children>
+                </HBox>
+                <SplitPane dividerPositions="0.5" orientation="VERTICAL" prefHeight="200.0" prefWidth="160.0" VBox.vgrow="ALWAYS">
+                    <items>
+                        <MyStyleClassedTextArea fx:id="textAreaOrigin" editable="false" prefHeight="200.0" prefWidth="200.0" promptText="源数据" />
+                        <MyStyleClassedTextArea fx:id="textAreaFilter" editable="false" prefHeight="200.0" prefWidth="200.0" promptText="过滤后数据" />
+                    </items>
+                </SplitPane>
+                <HBox alignment="CENTER_LEFT" VBox.vgrow="NEVER">
+                    <children>
+                        <Label maxHeight="1.7976931348623157E308" text="接收量：" />
+                        <Label fx:id="lbRecvBytes" maxHeight="1.7976931348623157E308" text="0 B" />
+                    </children>
+                </HBox>
+            </children>
+            <padding>
+                <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+            </padding>
+        </VBox>
+    </children>
+</fx:root>

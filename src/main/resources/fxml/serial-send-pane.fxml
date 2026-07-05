@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><?import indi.lt.serialtool.component.*?><?import javafx.geometry.*?><?import javafx.scene.control.*?><?import javafx.scene.layout.*?>
+<fx:root dividerPositions="0.6" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="0.0"
+         minWidth="0.0" prefHeight="603.0" prefWidth="852.0" type="SplitPane" xmlns="http://javafx.com/javafx/17.0.2-ea"
+         xmlns:fx="http://javafx.com/fxml/1" fx:controller="indi.lt.serialtool.controller.SerialSendCtrl">
+    <items>
+        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="160.0" prefWidth="100.0">
+            <children>
+                <VBox layoutX="8.0" layoutY="20.0" prefHeight="398.0" prefWidth="306.0" spacing="10.0"
+                      AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0"
+                      AnchorPane.topAnchor="0.0">
+                    <children>
+                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                            <children>
+                                <Label text="显示区："/>
+                                <Button mnemonicParsing="false" text="恢复自动滚动" onAction="#restoreScrolling"/>
+                                <Button mnemonicParsing="false" text="清空显示" onAction="#clearLogs"/>
+                                <Region HBox.hgrow="ALWAYS"/>
+                            </children>
+                        </HBox>
+
+                        <MyStyleClassedTextArea fx:id="taRecvArea" prefHeight="200.0" prefWidth="200.0"
+                                                VBox.vgrow="ALWAYS"/>
+                        <HBox prefHeight="180.0" prefWidth="200.0" spacing="10.0">
+                            <children>
+                                <VBox HBox.hgrow="NEVER">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" prefWidth="250.0" spacing="10.0"
+                                              VBox.vgrow="NEVER">
+                                            <children>
+                                                <Label minWidth="50.0" text="串   口："/>
+                                                <SerialPortCombBox fx:id="cbSerialList"
+                                                                   maxWidth="1.7976931348623157E308" prefWidth="150.0"
+                                                                   HBox.hgrow="ALWAYS"/>
+                                            </children>
+                                        </HBox>
+                                        <HBox alignment="CENTER_LEFT" prefHeight="100.0" prefWidth="200.0"
+                                              spacing="10.0" VBox.vgrow="ALWAYS">
+                                            <children>
+                                                <Label minWidth="50.0" text="波特率："/>
+                                                <ComboBox fx:id="cbBautrate" prefWidth="150.0" HBox.hgrow="ALWAYS"/>
+                                                <Button fx:id="btnMoreSettings" minWidth="80.0" mnemonicParsing="false"
+                                                        onAction="#showMoreSettings" text="更多设置"/>
+                                            </children>
+                                        </HBox>
+                                        <SerialToggleButton fx:id="btnOpenSerial" maxWidth="1.7976931348623157E308"
+                                                            mnemonicParsing="false" selectedText="关闭串口"
+                                                            text="打开串口" unSelectedText="打开串口"/>
+                                    </children>
+                                </VBox>
+                                <VBox HBox.hgrow="NEVER">
+                                    <children>
+                                        <CheckBox fx:id="cbHexDisplay" maxHeight="1.7976931348623157E308"
+                                                  mnemonicParsing="false" text="HEX显示"/>
+                                        <Region minWidth="0.0" VBox.vgrow="ALWAYS"/>
+                                        <CheckBox fx:id="cbHexSend" maxHeight="1.7976931348623157E308" mnemonicParsing="false"
+                                                  text="HEX发送"/>
+                                        <Region VBox.vgrow="ALWAYS"/>
+                                        <CheckBox fx:id="lineBreak" maxHeight="1.7976931348623157E308"
+                                                  mnemonicParsing="false" text="自动换行"/>
+                                        <Region VBox.vgrow="ALWAYS"/>
+                                        <CheckBox fx:id="cbTimeStampDisplay" maxHeight="1.7976931348623157E308"
+                                                  mnemonicParsing="false" text="时间戳显示"/>
+                                    </children>
+                                </VBox>
+                                <VBox prefHeight="200.0" prefWidth="100.0" spacing="10.0" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <TextArea fx:id="taSendArea" prefHeight="200.0" prefWidth="200.0"
+                                                  promptText="发送区，输入指令进行发送" VBox.vgrow="ALWAYS"/>
+                                        <HBox alignment="CENTER_RIGHT" prefHeight="100.0" prefWidth="200.0"
+                                              spacing="10.0">
+                                            <children>
+                                                <Button mnemonicParsing="false" text="清空发送"/>
+                                                <Button fx:id="btnSend" mnemonicParsing="false" styleClass="accent"
+                                                        text="发送"/>
+                                            </children>
+                                        </HBox>
+                                    </children>
+                                </VBox>
+                            </children>
+                            <padding>
+                                <Insets bottom="20.0" top="10.0"/>
+                            </padding>
+                        </HBox>
+                        <HBox alignment="CENTER_LEFT">
+                            <children>
+                                <Label text="接收量：" />
+                                <Label fx:id="lbRecvBytes" text="0(0)B"/>
+                                <Region HBox.hgrow="ALWAYS"/>
+                                <Label text="发送量：" />
+                                <Label fx:id="lbSendBytes" text="0(0)B"/>
+                            </children>
+                        </HBox>
+                    </children>
+                </VBox>
+            </children>
+            <padding>
+                <Insets right="10.0"/>
+            </padding>
+        </AnchorPane>
+        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="160.0" prefWidth="100.0">
+            <children>
+                <VBox prefHeight="200.0" prefWidth="100.0" spacing="10.0" AnchorPane.bottomAnchor="0.0"
+                      AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                    <children>
+                        <HBox alignment="CENTER_LEFT">
+                            <children>
+                                <Label maxWidth="1.7976931348623157E308" text="自定义指令区：" HBox.hgrow="ALWAYS"/>
+                                <SerialToggleButton fx:id="btnScheduleSend" mnemonicParsing="false" text="开启定时发送"
+                                                    selectedText="停止定时发送" unSelectedText="开启定时发送"/>
+                            </children>
+                        </HBox>
+                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                            <children>
+                                <TextField fx:id="tfRemark" promptText="输入备注"/>
+                                <TextField fx:id="tfCommand" promptText="输入指令"/>
+                                <CheckBox fx:id="cbIsHex" minWidth="80.0" mnemonicParsing="false" text="是否HEX"/>
+                                <Button minWidth="80.0" mnemonicParsing="false" onAction="#addCommand" text="添加指令"/>
+                            </children>
+                        </HBox>
+                        <StackPane fx:id="spTableContainer" prefHeight="150.0" prefWidth="200.0" VBox.vgrow="ALWAYS"/>
+                    </children>
+                </VBox>
+            </children>
+            <padding>
+                <Insets left="10.0"/>
+            </padding>
+        </AnchorPane>
+    </items>
+    <padding>
+        <Insets bottom="20.0" left="20.0" right="20.0" top="20.0"/>
+    </padding>
+</fx:root>

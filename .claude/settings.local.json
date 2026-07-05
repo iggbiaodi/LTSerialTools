@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gradle run:*)",
+      "Bash(./gradlew run:*)",
+      "Bash(cd /d D:\\\\MyCode\\\\IDEA\\\\LTSerialTool)",
+      "Bash(gradle compileJava compileKotlin)",
+      "Bash(./gradlew compileJava compileKotlin)",
+      "mcp__spring-ai-server__readFile"
+    ]
+  }
+}
