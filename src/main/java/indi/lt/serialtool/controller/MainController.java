@@ -22,7 +22,6 @@ import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.Node;
 import javafx.scene.control.*;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.ColumnConstraints;
@@ -258,6 +257,7 @@ public class MainController implements Initializable {
         BaseStage baseStage = new BaseStage();
         ToolBar toolBar = new ToolBar();
         toolBar.setMinHeight(40);
+        toolBar.getItems().add(createLogoView(28));
         baseStage.registryDragger(toolBar);
         VBox.setVgrow(content, Priority.ALWAYS);
 
@@ -368,10 +368,7 @@ public class MainController implements Initializable {
         mbTools.setGraphic(new FontIcon(TUNE));
         mbHelp.setGraphic(new FontIcon(INFO));
 
-        Image logo = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/image/logo.png")));
-        ImageView logoView = new ImageView(logo);
-        logoView.setFitWidth(38);
-        logoView.setFitHeight(38);
+        ImageView logoView = createLogoView(38);
         Region region = new Region();
         region.setMinHeight(10);
         toolBar.getItems().add(0, logoView);
@@ -388,6 +385,14 @@ public class MainController implements Initializable {
         refreshAutoSaveIntervalMenuText();
         refreshAutoSaveFileSizeMenuText();
         refreshBufferCapacityMenuText();
+    }
+
+    private ImageView createLogoView(double size) {
+        ImageView logoView = new ImageView(FontSettingsManager.loadAppIcon());
+        logoView.setFitWidth(size);
+        logoView.setFitHeight(size);
+        logoView.setPreserveRatio(true);
+        return logoView;
     }
 
     /**
@@ -815,6 +820,117 @@ public class MainController implements Initializable {
         } catch (Exception ex) {
             LOG.error(ex);
         }
+    }
+
+    @FXML
+    public void showWaveformProtocolHelp(ActionEvent actionEvent) {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("波形图协议");
+        dialog.setHeaderText("波形图模式数据协议说明");
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.OK);
+
+        TextArea textArea = new TextArea(buildWaveformProtocolHelpText());
+        textArea.setEditable(false);
+        textArea.setWrapText(true);
+        textArea.setPrefColumnCount(72);
+        textArea.setPrefRowCount(26);
+
+        dialog.getDialogPane().setContent(textArea);
+        dialog.getDialogPane().setMinWidth(760);
+        dialog.getDialogPane().setMinHeight(620);
+        FontSettingsManager.configureDialog(dialog);
+        dialog.showAndWait();
+    }
+
+    private String buildWaveformProtocolHelpText() {
+        return """
+                一、协议格式
+                每一帧数据格式固定为：
+                帧头 03 FC + 数据区 payload + 帧尾 FC 03
+
+                也就是完整格式：
+                03 FC [数据1][数据2][数据3]... FC 03
+
+                二、解析规则
+                1. 波形图模式会把一帧里的每个数据值当成一路通道数据。
+                2. 一帧最多显示 8 路，超过 8 路时，只显示前 8 路。
+                3. 数据区字节序是大端序，也就是高字节在前，低字节在后。
+                4. 数据区长度必须和当前选择的数据类型匹配：
+                   有符号8位 / 无符号8位：每个点 1 字节
+                   有符号16位 / 无符号16位：每个点 2 字节
+                   有符号32位 / 无符号32位：每个点 4 字节
+                5. 如果数据区最后剩下不足一个完整数据点的字节，这几个字节会被忽略。
+                6. 可以连续发送多帧，程序会自动逐帧解析。
+
+                三、通道对应关系
+                一帧中第 1 个值 -> 通道1
+                一帧中第 2 个值 -> 通道2
+                一帧中第 3 个值 -> 通道3
+                以此类推
+
+                四、具体例子
+                例1：当前数据类型选择“无符号8位”
+                想显示 3 路数据：10、20、30
+                发送十六进制：
+                03 FC 0A 14 1E FC 03
+                解析结果：
+                通道1=10，通道2=20，通道3=30
+
+                例2：当前数据类型选择“无符号16位”
+                想显示 3 路数据：1000、2000、3000
+                十进制转十六进制分别是：
+                1000 = 03 E8
+                2000 = 07 D0
+                3000 = 0B B8
+                发送十六进制：
+                03 FC 03 E8 07 D0 0B B8 FC 03
+                解析结果：
+                通道1=1000，通道2=2000，通道3=3000
+
+                例3：当前数据类型选择“有符号16位”
+                想显示 4 路数据：-100、0、100、200
+                16位有符号大端表示分别是：
+                -100 = FF 9C
+                0 = 00 00
+                100 = 00 64
+                200 = 00 C8
+                发送十六进制：
+                03 FC FF 9C 00 00 00 64 00 C8 FC 03
+                解析结果：
+                通道1=-100，通道2=0，通道3=100，通道4=200
+
+                例4：当前数据类型选择“无符号32位”
+                想显示 2 路数据：1、100000
+                1 = 00 00 00 01
+                100000 = 00 01 86 A0
+                发送十六进制：
+                03 FC 00 00 00 01 00 01 86 A0 FC 03
+
+                五、连续发送示例
+                如果要连续输出两帧，可以直接连着发：
+                03 FC 01 02 03 FC 03 03 FC 04 05 06 FC 03
+
+                如果当前数据类型是“无符号8位”，那么会依次显示：
+                第1帧：通道1=1，通道2=2，通道3=3
+                第2帧：通道1=4，通道2=5，通道3=6
+
+                六、使用建议
+                1. 发送前先在波形图模式里把“数据类型”选对，否则数值会解析错。
+                2. 如果你发的是十六进制数据，发送模式里请勾选“HEX发送”。
+                3. 如果你的设备是按小端序出数，需要先在设备端改成大端序，或者发送前自己转换字节顺序。
+                4. 如果只想显示 1 路波形，每帧只放 1 个数据值即可。
+                5. 如果想显示多路同步波形，每帧按顺序放多个数据值即可。
+
+                七、最简单可用模板
+                无符号8位，2路：
+                03 FC 11 22 FC 03
+
+                无符号16位，2路：
+                03 FC 00 64 00 C8 FC 03
+
+                有符号16位，2路：
+                03 FC FF 9C 00 64 FC 03
+                """;
     }
 
     @FXML

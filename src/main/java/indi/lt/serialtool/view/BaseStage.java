@@ -2,10 +2,7 @@ package indi.lt.serialtool.view;
 
 import github.nonoas.jfx.flat.ui.stage.AppStage;
 import indi.lt.serialtool.global.FontSettingsManager;
-import javafx.scene.image.Image;
 import javafx.stage.Stage;
-
-import java.util.Collections;
 
 /**
  * 程序通用窗口，设置了一系列通用的样式和参数
@@ -34,6 +31,6 @@ public class BaseStage extends AppStage {
                 FontSettingsManager.applyTo(stage.getScene().getRoot());
             }
         }
-        addIcons(Collections.singleton(new Image("image/logo.png")));
+        FontSettingsManager.applyAppIcon(getStage());
     }
 }

@@ -1,5 +1,6 @@
 package indi.lt.serialtool.view;
 
+import indi.lt.serialtool.global.FontSettingsManager;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -27,6 +28,7 @@ public class SaveProgressStage {
         stage.setResizable(false);
         stage.setAlwaysOnTop(true);
         stage.setOnCloseRequest(event -> event.consume());
+        FontSettingsManager.applyAppIcon(stage);
 
         progressBar.setPrefWidth(280);
         progressBar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);

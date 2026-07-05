@@ -665,6 +665,7 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
         dialog.getDialogPane().setContent(grid);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         dialog.setResizable(true);
+        FontSettingsManager.configureDialog(dialog);
 
         // 自动聚焦到指令内容
         Platform.runLater(() -> commandArea.requestFocus());

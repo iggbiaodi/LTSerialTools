@@ -5,6 +5,7 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Dialog;
+import javafx.scene.control.DialogEvent;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.image.Image;
@@ -91,18 +92,27 @@ public final class FontSettingsManager {
         if (stylesheet != null && !dialogPane.getStylesheets().contains(stylesheet)) {
             dialogPane.getStylesheets().add(stylesheet);
         }
-        dialogPane.sceneProperty().addListener((obs, oldScene, newScene) -> {
-            if (newScene != null) {
-                applyDialogWindowIcon(newScene.getWindow());
-                newScene.windowProperty().addListener((windowObs, oldWindow, newWindow) -> applyDialogWindowIcon(newWindow));
-            }
-        });
+        dialogPane.sceneProperty().addListener((obs, oldScene, newScene) -> configureDialogScene(newScene));
+        configureDialogScene(dialogPane.getScene());
+        dialog.addEventHandler(DialogEvent.DIALOG_SHOWING, event -> configureDialogScene(dialogPane.getScene()));
+        dialog.addEventHandler(DialogEvent.DIALOG_SHOWN, event -> configureDialogScene(dialogPane.getScene()));
         applyTo(dialogPane);
     }
 
     public static String getAppStylesheetUrl() {
         var resource = FontSettingsManager.class.getResource(APP_STYLESHEET);
         return resource == null ? null : resource.toExternalForm();
+    }
+
+    public static void applyAppIcon(Stage stage) {
+        if (stage == null || !stage.getIcons().isEmpty()) {
+            return;
+        }
+        stage.getIcons().add(loadAppIcon());
+    }
+
+    public static Image loadAppIcon() {
+        return new Image(Objects.requireNonNull(FontSettingsManager.class.getResourceAsStream(APP_ICON)));
     }
 
     private static List<String> loadAvailableFontFamilies() {
@@ -176,9 +186,15 @@ public final class FontSettingsManager {
         if (!(window instanceof Stage stage)) {
             return;
         }
-        if (stage.getIcons().isEmpty()) {
-            stage.getIcons().add(loadAppIcon());
+        applyAppIcon(stage);
+    }
+
+    private static void configureDialogScene(Scene scene) {
+        if (scene == null) {
+            return;
         }
+        applyDialogWindowIcon(scene.getWindow());
+        scene.windowProperty().addListener((windowObs, oldWindow, newWindow) -> applyDialogWindowIcon(newWindow));
     }
 
     private static String buildFontStyle(String fontFamily) {
@@ -189,7 +205,4 @@ public final class FontSettingsManager {
         return fontFamily.replace("\\", "\\\\").replace("'", "\\'");
     }
 
-    private static Image loadAppIcon() {
-        return new Image(Objects.requireNonNull(FontSettingsManager.class.getResourceAsStream(APP_ICON)));
-    }
 }
