@@ -235,12 +235,13 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
      * 初始化串口下拉列表
      */
     private void initSerialComboBox() {
+        int receiveTimeoutMs = getReceiveTimeoutMs();
         // 串口下拉框初始化
         cbSerialList.init(keyLastSerial,
                 () -> UIUtil.getSelectedInt(cbBautrate, DEFAULT_BAUTRATE),
                 btnOpenSerial.selectedProperty(),
                 SerialPort.TIMEOUT_WRITE_BLOCKING | SerialPort.TIMEOUT_READ_SEMI_BLOCKING,
-                0,  // timeOutMillionTime
+                receiveTimeoutMs,
                 serialPortSettings);  // settings
 
         // 选中波特率变化时重新打开串口
@@ -302,6 +303,19 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
         checkBox.selectedProperty().addListener((obs, oldVal, newVal) -> ConfigManager.set(key, String.valueOf(newVal)));
     }
 
+    private int getReceiveTimeoutMs() {
+        String rawTimeout = ConfigManager.get(
+                ConfigManager.KEY_RECEIVE_TIMEOUT_MS,
+                String.valueOf(ConfigManager.DEFAULT_RECEIVE_TIMEOUT_MS)
+        );
+        try {
+            int timeout = Integer.parseInt(rawTimeout);
+            return timeout > 0 ? timeout : ConfigManager.DEFAULT_RECEIVE_TIMEOUT_MS;
+        } catch (NumberFormatException e) {
+            return ConfigManager.DEFAULT_RECEIVE_TIMEOUT_MS;
+        }
+    }
+
     /**
      * 绑定按钮事件
      */
@@ -335,6 +349,7 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
                     cbTimeStampDisplay.selectedProperty(),
                     cbHexDisplay.selectedProperty(),
                     () -> highlighter.schedule(),
+                    getReceiveTimeoutMs(),
                     true
             );
             serialReadService.setOnRecvBytesChanged(bytes ->
@@ -422,12 +437,14 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
     private void applySendTimeout() {
         SerialPort port = cbSerialList.getSelectedPort();
         if (port != null && port.isOpen()) {
+            int receiveTimeoutMs = getReceiveTimeoutMs();
+            cbSerialList.setTimeoutMillis(receiveTimeoutMs);
             port.setComPortTimeouts(
                     SerialPort.TIMEOUT_WRITE_BLOCKING | SerialPort.TIMEOUT_READ_SEMI_BLOCKING,
-                    0,                // 读超时保持 0（半阻塞）
+                    receiveTimeoutMs,
                     sendTimeoutMs     // 写超时
             );
-            LOG.info("发送超时已设置: {}ms", sendTimeoutMs);
+            LOG.info("发送模式超时已设置: 接收={}ms, 发送={}ms", receiveTimeoutMs, sendTimeoutMs);
         }
     }
 
