@@ -17,6 +17,7 @@
                                 <Region HBox.hgrow="ALWAYS"/>
                             </children>
                         </HBox>
+
                         <MyStyleClassedTextArea fx:id="taRecvArea" prefHeight="200.0" prefWidth="200.0"
                                                 VBox.vgrow="ALWAYS"/>
                         <HBox prefHeight="180.0" prefWidth="200.0" spacing="10.0">

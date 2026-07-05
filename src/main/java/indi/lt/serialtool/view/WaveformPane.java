@@ -75,7 +75,7 @@ public class WaveformPane extends BorderPane {
     private static final double MAX_X_ZOOM_FACTOR = 20.0;
     private static final double MIN_Y_ZOOM_FACTOR = 0.1;
     private static final double MAX_Y_ZOOM_FACTOR = 20.0;
-    private static final double WAVEFORM_STROKE_WIDTH = 1.0;
+    private static final double WAVEFORM_STROKE_WIDTH = 1.2;
     private static final String[] SERIES_COLORS = {
             "#ff0808",
             "#359e4d",
@@ -855,17 +855,14 @@ public class WaveformPane extends BorderPane {
     private void applyGridLineStyle() {
         // 图表背景
         Node bg = lineChart.lookup(".chart-plot-background");
-        if (bg != null) {
-            bg.setStyle("-fx-background-color: #f8f8f8;");
-        }
-        // 水平网格线
-        for (Node node : lineChart.lookupAll(".chart-horizontal-grid-lines")) {
-            node.setStyle("-fx-stroke: #e8e8e8; -fx-stroke-width: 0.5;");
-        }
-        // 垂直网格线（虽然已关闭，但以防残留）
-        for (Node node : lineChart.lookupAll(".chart-vertical-grid-lines")) {
-            node.setStyle("-fx-stroke: #e8e8e8; -fx-stroke-width: 0.5;");
-        }
+//        // 水平网格线
+//        for (Node node : lineChart.lookupAll(".chart-horizontal-grid-lines")) {
+//            node.setStyle("-fx-stroke: #e8e8e8; -fx-stroke-width: 0.5;");
+//        }
+//        // 垂直网格线（虽然已关闭，但以防残留）
+//        for (Node node : lineChart.lookupAll(".chart-vertical-grid-lines")) {
+//            node.setStyle("-fx-stroke: #e8e8e8; -fx-stroke-width: 0.5;");
+//        }
     }
 
     private String formatZoomText(double factor) {

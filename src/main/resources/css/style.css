@@ -3,10 +3,6 @@
     -app-log-highlight-color: rgba(255, 241, 118, 0.45);
 }
 
-.dialog-pane .content {
-    -fx-text-fill: #111;
-}
-
 .sys-btn-box .button {
     -fx-border-width: 0;
 }
