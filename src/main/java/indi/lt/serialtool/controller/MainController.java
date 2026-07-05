@@ -10,6 +10,7 @@ import indi.lt.serialtool.global.FontSettingsManager;
 import indi.lt.serialtool.service.AutoSaveService;
 import indi.lt.serialtool.utils.ZipUtil;
 import indi.lt.serialtool.utils.UIUtil;
+import indi.lt.serialtool.view.AboutDialog;
 import indi.lt.serialtool.view.AsciiStage;
 import indi.lt.serialtool.view.BaseStage;
 import indi.lt.serialtool.view.SerialReceivePane;
@@ -20,7 +21,6 @@ import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.image.ImageView;
@@ -31,7 +31,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.scene.text.TextAlignment;
 import javafx.stage.FileChooser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -59,7 +58,6 @@ import static org.kordamp.ikonli.material2.Material2OutlinedMZ.TUNE;
 public class MainController implements Initializable {
     private static final String KEY_AUTO_SAVE = "main.form.autoSave";
     private static final String KEY_ZIP_SPLIT_SIZE = "main.zip.splitSize";
-    private static final String ABOUT_UPDATE_DATE = "2026年7月";
     private final Logger LOG = LogManager.getLogger(MainController.class);
 
     @FXML
@@ -827,79 +825,8 @@ public class MainController implements Initializable {
 
     @FXML
     public void showAboutDialog(ActionEvent actionEvent) {
-        Dialog<Void> dialog = new Dialog<>();
-        dialog.setTitle("关于" + BaseStage.APP_NAME);
-        dialog.setHeaderText(null);
-        dialog.setGraphic(null);
-        dialog.setResizable(false);
-        if (rootPane != null && rootPane.getScene() != null) {
-            dialog.initOwner(rootPane.getScene().getWindow());
-        }
-
-        DialogPane dialogPane = dialog.getDialogPane();
-        dialogPane.getButtonTypes().add(ButtonType.CLOSE);
-        Node closeButton = dialogPane.lookupButton(ButtonType.CLOSE);
-        if (closeButton != null) {
-            closeButton.setVisible(false);
-            closeButton.setManaged(false);
-        }
-
-        VBox content = new VBox(8);
-        content.setAlignment(Pos.TOP_CENTER);
-        content.setPadding(new javafx.geometry.Insets(10, 12, 0, 12));
-        content.setPrefWidth(670);
-        content.setStyle("-fx-background-color: -color-bg-default;");
-
-        Label titleLabel = new Label(BaseStage.APP_NAME);
-        titleLabel.setAlignment(Pos.CENTER);
-        titleLabel.setMaxWidth(Double.MAX_VALUE);
-        titleLabel.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: -color-fg-default;");
-
-        Separator separator = new Separator();
-        separator.setMaxWidth(Double.MAX_VALUE);
-
-        ImageView logoView = createLogoView(40);
-        logoView.setFitWidth(40);
-        logoView.setFitHeight(40);
-        VBox.setMargin(logoView, new javafx.geometry.Insets(0, 0, 4, 0));
-
-        VBox infoBox = new VBox(12);
-        infoBox.setAlignment(Pos.TOP_CENTER);
-        infoBox.setPadding(new javafx.geometry.Insets(6, 18, 12, 18));
-        infoBox.setMaxWidth(Double.MAX_VALUE);
-        infoBox.setStyle("-fx-background-color: -color-bg-default; -fx-border-color: -color-border-default; -fx-border-width: 1 0 0 0;");
-
-        Label description = createAboutLabel("LTSerialTool是一款功能实用的串口调试助手");
-        Label features = createAboutLabel("支持多串口接收、关键字过滤&&高亮、自定义背景、串口发送、自定义添加指令、定时发送、接收&&发送数据量统计、波形图实时绘制等功能。");
-        Label authorTitle = createAboutLabel("关于作者:");
-        authorTitle.setStyle(authorTitle.getStyle() + " -fx-font-weight: bold;");
-
-        infoBox.getChildren().addAll(
-                description,
-                features,
-                authorTitle,
-                createAboutLabel("开发者: DaBiaoDi"),
-                createAboutLabel("联系方式: 1397018103@qq.com"),
-                createAboutLabel("版本: v" + BaseStage.APP_VERSION),
-                createAboutLabel("更新日期: " + ABOUT_UPDATE_DATE)
-        );
-
-        content.getChildren().addAll(titleLabel, separator, logoView, infoBox);
-        dialogPane.setContent(content);
-        dialogPane.setMinWidth(700);
-        dialogPane.setPrefWidth(700);
-        FontSettingsManager.configureDialog(dialog);
+        AboutDialog dialog = new AboutDialog(rootPane == null || rootPane.getScene() == null ? null : rootPane.getScene().getWindow());
         dialog.showAndWait();
-    }
-
-    private Label createAboutLabel(String text) {
-        Label label = new Label(text);
-        label.setAlignment(Pos.CENTER);
-        label.setMaxWidth(Double.MAX_VALUE);
-        label.setWrapText(true);
-        label.setTextAlignment(TextAlignment.CENTER);
-        label.setStyle("-fx-text-fill: -color-fg-default;");
-        return label;
     }
 
     @FXML
