@@ -572,7 +572,8 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
                 cbSerialList.getSelectedPort(),
                 taRecvArea,
                 cbHexDisplay,
-                cbTimeStampDisplay
+                cbTimeStampDisplay,
+                lineBreak
         );
         serialSenderService.setOnSentBytesChanged(bytes ->
                 Platform.runLater(() -> {
