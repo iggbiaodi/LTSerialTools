@@ -84,6 +84,8 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
     private StackPane spTableContainer;
     @FXML
     private Button btnMoreSettings;
+    @FXML
+    private Label lbRecvBytes;
 
     private SerialSendPane rootPane;
 
@@ -106,6 +108,7 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
 
     // 串口参数设置
     private SerialPortSettings serialPortSettings;
+    private long recvBytesBase = 0L;
 
     // 串口参数设置对话框 key
     private static final String KEY_SERIAL_SETTINGS = "sendModeSerialSettings";
@@ -141,6 +144,7 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
         setupButtonActions();
         restoreFormState();
         bindFormStatePersistence();
+        lbRecvBytes.setText(formatBytes(0L));
 
         // 定时发送
         btnScheduleSend.selectedProperty().addListener((observable, oldValue, newValue) -> {
@@ -329,6 +333,9 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
                     () -> highlighter.schedule(),
                     true
             );
+            serialReadService.setOnRecvBytesChanged(bytes ->
+                    Platform.runLater(() -> lbRecvBytes.setText(formatBytes(recvBytesBase + bytes)))
+            );
             serialReadService.start();
             // 如果定时发送已勾选，自动启动发送
             if (btnScheduleSend.isSelected() && (serialSenderService == null || !serialSenderService.isRunning())) {
@@ -428,6 +435,7 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
         if (btnScheduleSend.isSelected()) {
             btnScheduleSend.setSelected(false);
         }
+        recvBytesBase += serialReadService != null ? serialReadService.getRecvBytesCount() : 0L;
         if (cbSerialList.getSelectedPort() != null && cbSerialList.getSelectedPort().isOpen()) {
             cbSerialList.getSelectedPort().closePort();
             LOG.info("串口已关闭");
@@ -435,7 +443,9 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
         }
         if (serialReadService != null) {
             serialReadService.cancel();
+            serialReadService = null;
         }
+        lbRecvBytes.setText(formatBytes(recvBytesBase));
     }
 
     /**
@@ -732,5 +742,24 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
     @FXML
     private void clearLogs() {
         taRecvArea.getArea().clear();
+        recvBytesBase = 0L;
+        if (serialReadService != null) {
+            serialReadService.resetRecvBytesCount();
+        } else {
+            lbRecvBytes.setText(formatBytes(0L));
+        }
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes < 1024) {
+            return bytes + "(0)B";
+        }
+        if (bytes < 1024 * 1024) {
+            return String.format("%d(%.1fK)B", bytes, bytes / 1024.0);
+        }
+        if (bytes < 1024L * 1024L * 1024L) {
+            return String.format("%d(%.1fM)B", bytes, bytes / (1024.0 * 1024.0));
+        }
+        return String.format("%d(%.1fG)B", bytes, bytes / (1024.0 * 1024.0 * 1024.0));
     }
 }
