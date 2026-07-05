@@ -57,7 +57,7 @@
                         <MenuItem mnemonicParsing="false" onAction="#showWaveformProtocolHelp" text="波形图协议"/>
                         <MenuItem mnemonicParsing="false" onAction="#goToWebsite" text="前往官网"/>
                         <MenuItem mnemonicParsing="false" text="投喂作者"/>
-                        <MenuItem mnemonicParsing="false" text="关于"/>
+                        <MenuItem mnemonicParsing="false" onAction="#showAboutDialog" text="关于"/>
                     </items>
                 </MenuButton>
             </items>

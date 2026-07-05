@@ -19,6 +19,8 @@ import indi.lt.serialtool.utils.StringUtil;
 import indi.lt.serialtool.utils.UIUtil;
 import indi.lt.serialtool.view.SerialSendPane;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
@@ -209,7 +211,6 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
         List<Integer> baudRates = Arrays.asList(1200, 2400, 4800, 9600, 38400, 57600, 115200, 230400, DEFAULT_BAUTRATE, 2000000, 3000000);
         cbBautrate.getItems().clear();
         cbBautrate.getItems().addAll(baudRates);
-        cbBautrate.setEditable(true);
         cbBautrate.setConverter(new StringConverter<Integer>() {
             @Override
             public String toString(Integer value) {
@@ -227,6 +228,7 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
                 }
             }
         });
+        cbBautrate.setEditable(true);
         int baudRate = serialPortSettings != null ? serialPortSettings.getBaudRate() : DEFAULT_BAUTRATE;
         cbBautrate.setValue(baudRate);
     }
@@ -244,12 +246,22 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
                 receiveTimeoutMs,
                 serialPortSettings);  // settings
 
-        // 选中波特率变化时重新打开串口
-        cbBautrate.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+        addBaudRateSelectionListener();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void addBaudRateSelectionListener() {
+        ObservableValue<Object> selectedItemProperty =
+                (ObservableValue<Object>) (ObservableValue<?>) cbBautrate.getSelectionModel().selectedItemProperty();
+        ChangeListener<Object> listener = (obs, oldVal, newVal) -> {
+            if (parseBaudRateValue(newVal, serialPortSettings.getBaudRate()) == null) {
+                return;
+            }
             if (cbSerialList.getSelectedPort() != null && cbSerialList.getSelectedPort().isOpen()) {
                 cbSerialList.openSelectedSerial();
             }
-        });
+        };
+        selectedItemProperty.addListener(listener);
     }
 
     /**
@@ -286,13 +298,40 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
         bindCheckBoxPersistence(lineBreak, KEY_LINE_BREAK);
         bindCheckBoxPersistence(cbTimeStampDisplay, KEY_TIMESTAMP_DISPLAY);
         bindCheckBoxPersistence(cbIsHex, KEY_COMMAND_HEX);
-        cbBautrate.valueProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal == null) {
+        addBaudRateValueListener();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void addBaudRateValueListener() {
+        ObservableValue<Object> valueProperty = (ObservableValue<Object>) (ObservableValue<?>) cbBautrate.valueProperty();
+        ChangeListener<Object> listener = (obs, oldVal, newVal) -> {
+            Integer baudRate = parseBaudRateValue(newVal, serialPortSettings.getBaudRate());
+            if (baudRate == null) {
                 return;
             }
-            serialPortSettings.setBaudRate(newVal);
+            if (!(newVal instanceof Integer)) {
+                Platform.runLater(() -> cbBautrate.setValue(baudRate));
+                return;
+            }
+            serialPortSettings.setBaudRate(baudRate);
             ConfigManager.putObject(KEY_SERIAL_SETTINGS, serialPortSettings);
-        });
+        };
+        valueProperty.addListener(listener);
+    }
+
+    private Integer parseBaudRateValue(Object value, int fallback) {
+        if (value instanceof Integer baudRate) {
+            return baudRate > 0 ? baudRate : fallback;
+        }
+        if (value instanceof String text) {
+            try {
+                int baudRate = Integer.parseInt(text.trim());
+                return baudRate > 0 ? baudRate : fallback;
+            } catch (NumberFormatException ex) {
+                return fallback;
+            }
+        }
+        return value == null ? null : fallback;
     }
 
     private void bindTextPersistence(TextInputControl textInputControl, String key) {
@@ -713,10 +752,7 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
         ConfigManager.put(KEY_COMMAND_HEX, String.valueOf(cbIsHex.isSelected()));
         ConfigManager.put(KEY_SEND_TIMEOUT, String.valueOf(sendTimeoutMs));
 
-        Integer baudRate = cbBautrate.getValue();
-        if (baudRate != null) {
-            serialPortSettings.setBaudRate(baudRate);
-        }
+        serialPortSettings.setBaudRate(UIUtil.getSelectedInt(cbBautrate, serialPortSettings.getBaudRate()));
         ConfigManager.putObject(KEY_SERIAL_SETTINGS, serialPortSettings);
     }
 

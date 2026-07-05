@@ -111,14 +111,13 @@ public class SerialSenderService extends Service<BufferedDisplayLine> {
                             }
                         }
                         if (written != data.length) {
-                            LOG.warn("定时发送超时: {}/{} 字节, cmd={}", written, data.length, currentCommand.getCommand());
+                            LOG.info("定时发送超时: {}/{} 字节, cmd={}", written, data.length, currentCommand.getCommand());
                         } else {
                             LOG.info("已发送: {}", currentCommand.getCommand());
                         }
 
                         String logBody = cbHexDisplay.isSelected() ? StringUtil.bytesToHexString(data) : textToSend;
                         BufferedDisplayLine.DataType dataType;
-                        ;
                         if (isHexCommand) {
                             dataType = HEX;
                         } else {

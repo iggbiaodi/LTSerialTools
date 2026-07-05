@@ -16,7 +16,6 @@ import indi.lt.serialtool.service.AutoSaveService
 import indi.lt.serialtool.service.SerialReadService
 import indi.lt.serialtool.utils.UIUtil
 import javafx.application.Platform
-import javafx.beans.Observable
 import javafx.beans.value.ObservableValue
 import javafx.collections.FXCollections
 import javafx.fxml.FXML
@@ -366,13 +365,18 @@ class SerialReceiveCtrl : Initializable, ZipDataProvider {
         }
     }
 
+    @Suppress("UNCHECKED_CAST")
     private fun initBautRateComboBoxAction() {
-        cbBautRateList.selectionModel.selectedItemProperty().addListener { _: Observable?, _: Int?, newVal: Int? ->
-            if (newVal != null) {
-                serialPortSettings.baudRate = newVal
-                cbSerialList.setSerialPortSettings(serialPortSettings)
-                ConfigManager.putObject(serialSettingsKey(), serialPortSettings)
+        val valueProperty = cbBautRateList.valueProperty() as ObservableValue<Any?>
+        valueProperty.addListener { _: ObservableValue<out Any?>?, _: Any?, newVal: Any? ->
+            val baudRate = parseBaudRateValue(newVal, serialPortSettings.baudRate) ?: return@addListener
+            if (newVal !is Int) {
+                Platform.runLater { cbBautRateList.value = baudRate }
+                return@addListener
             }
+            serialPortSettings.baudRate = baudRate
+            cbSerialList.setSerialPortSettings(serialPortSettings)
+            ConfigManager.putObject(serialSettingsKey(), serialPortSettings)
             onBaudRateChanged()
         }
     }
@@ -507,6 +511,7 @@ class SerialReceiveCtrl : Initializable, ZipDataProvider {
         val baudRates = FXCollections.observableArrayList(
             1200, 2400, 4800, 9600, 38400, 57600, 115200, 230400, 1500000, 2000000, 3000000
         )
+        cbBautRateList.isEditable = false
         cbBautRateList.items = baudRates
         cbBautRateList.converter = object : StringConverter<Int>() {
             override fun toString(value: Int?): String = value?.toString() ?: ""
@@ -514,8 +519,18 @@ class SerialReceiveCtrl : Initializable, ZipDataProvider {
                 return string?.trim()?.toIntOrNull() ?: serialPortSettings.baudRate
             }
         }
+        cbBautRateList.isEditable = true
         val baudRate = serialPortSettings.baudRate
         cbBautRateList.value = baudRate
+    }
+
+    private fun parseBaudRateValue(value: Any?, fallback: Int): Int? {
+        return when (value) {
+            is Int -> if (value > 0) value else fallback
+            is String -> value.trim().toIntOrNull()?.takeIf { it > 0 } ?: fallback
+            null -> null
+            else -> fallback
+        }
     }
 
     fun setSerialName(serialName: String?) {
@@ -532,12 +547,7 @@ class SerialReceiveCtrl : Initializable, ZipDataProvider {
         ConfigManager.put(formKey("timeDisplay"), cbTimeDisplay.isSelected.toString())
         ConfigManager.put(formKey("highlightKeyword"), cbHighlightKeyword.isSelected.toString())
         ConfigManager.put(formKey("keyword"), tfKeyWord.text ?: "")
-        cbBautRateList.value?.let {
-            try {
-                serialPortSettings.baudRate = it
-            } catch (_: NumberFormatException) {
-            }
-        }
+        serialPortSettings.baudRate = UIUtil.getSelectedInt(cbBautRateList, serialPortSettings.baudRate)
         ConfigManager.putObject(serialSettingsKey(), serialPortSettings)
     }
 

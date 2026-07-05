@@ -12,7 +12,10 @@ import javafx.stage.Stage;
  */
 public class BaseStage extends AppStage {
 
-    protected final String TITLE = "LTSerialTool-v2.16.0";
+    public static final String APP_NAME = "LTSerialTool";
+    public static final String APP_VERSION = "2.0.0";
+
+    protected final String TITLE = APP_NAME + "-v" + APP_VERSION;
 
     public BaseStage() {
         setTitle(TITLE);

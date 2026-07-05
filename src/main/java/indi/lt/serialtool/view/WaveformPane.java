@@ -14,6 +14,8 @@ import indi.lt.serialtool.service.SerialReadService;
 import indi.lt.serialtool.service.WaveformProtocolParser;
 import indi.lt.serialtool.utils.UIUtil;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
@@ -294,9 +296,30 @@ public class WaveformPane extends BorderPane {
     }
 
     private void initBaudRateList() {
+        cbBaudRateList.setEditable(false);
         cbBaudRateList.setItems(FXCollections.observableArrayList(
                 1200, 2400, 4800, 9600, 38400, 57600, 115200, 230400, 1500000, 2000000, 3000000
         ));
+        cbBaudRateList.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(Integer value) {
+                return value == null ? "" : value.toString();
+            }
+
+            @Override
+            public Integer fromString(String string) {
+                if (string == null || string.trim().isEmpty()) {
+                    return serialPortSettings.getBaudRate();
+                }
+                try {
+                    int baudRate = Integer.parseInt(string.trim());
+                    return baudRate > 0 ? baudRate : serialPortSettings.getBaudRate();
+                } catch (NumberFormatException ex) {
+                    return serialPortSettings.getBaudRate();
+                }
+            }
+        });
+        cbBaudRateList.setEditable(true);
     }
 
     private void initDataTypeList() {
@@ -380,15 +403,7 @@ public class WaveformPane extends BorderPane {
             clearWaveform();
         });
 
-        cbBaudRateList.valueProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal == null) {
-                return;
-            }
-            serialPortSettings.setBaudRate(newVal);
-            cbSerialList.setSerialPortSettings(serialPortSettings);
-            ConfigManager.putObject(KEY_SERIAL_SETTINGS, serialPortSettings);
-            onBaudRateChanged();
-        });
+        addBaudRateValueListener();
 
         btnOpenSerial.selectedProperty().addListener((obs, oldVal, selected) -> {
             if (selected) {
@@ -407,6 +422,41 @@ public class WaveformPane extends BorderPane {
             btnOpenSerial.setSelected(false);
             lbFrameInfo.setText("串口打开失败");
         });
+    }
+
+    @SuppressWarnings("unchecked")
+    private void addBaudRateValueListener() {
+        ObservableValue<Object> valueProperty = (ObservableValue<Object>) (ObservableValue<?>) cbBaudRateList.valueProperty();
+        ChangeListener<Object> listener = (obs, oldVal, newVal) -> {
+            Integer baudRate = parseBaudRateValue(newVal, serialPortSettings.getBaudRate());
+            if (baudRate == null) {
+                return;
+            }
+            if (!(newVal instanceof Integer)) {
+                Platform.runLater(() -> cbBaudRateList.setValue(baudRate));
+                return;
+            }
+            serialPortSettings.setBaudRate(baudRate);
+            cbSerialList.setSerialPortSettings(serialPortSettings);
+            ConfigManager.putObject(KEY_SERIAL_SETTINGS, serialPortSettings);
+            onBaudRateChanged();
+        };
+        valueProperty.addListener(listener);
+    }
+
+    private Integer parseBaudRateValue(Object value, int fallback) {
+        if (value instanceof Integer baudRate) {
+            return baudRate > 0 ? baudRate : fallback;
+        }
+        if (value instanceof String text) {
+            try {
+                int baudRate = Integer.parseInt(text.trim());
+                return baudRate > 0 ? baudRate : fallback;
+            } catch (NumberFormatException ex) {
+                return fallback;
+            }
+        }
+        return value == null ? null : fallback;
     }
 
     private void onSerialOpenSucceed() {
@@ -662,6 +712,7 @@ public class WaveformPane extends BorderPane {
         }
         ConfigManager.put(KEY_MAX_POINTS, String.valueOf(maxPoints));
         ConfigManager.put(KEY_VISIBLE_POINTS, String.valueOf(visiblePoints));
+        serialPortSettings.setBaudRate(UIUtil.getSelectedInt(cbBaudRateList, serialPortSettings.getBaudRate()));
         ConfigManager.putObject(KEY_SERIAL_SETTINGS, serialPortSettings);
     }
 
