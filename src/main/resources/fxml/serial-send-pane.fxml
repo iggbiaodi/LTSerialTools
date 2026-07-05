@@ -80,10 +80,13 @@
                                 <Insets bottom="20.0" top="10.0"/>
                             </padding>
                         </HBox>
-                        <HBox>
+                        <HBox alignment="CENTER_LEFT">
                             <children>
                                 <Label text="接收量：" />
                                 <Label fx:id="lbRecvBytes" text="0(0)B"/>
+                                <Region HBox.hgrow="ALWAYS"/>
+                                <Label text="发送量：" />
+                                <Label fx:id="lbSendBytes" text="0(0)B"/>
                             </children>
                         </HBox>
                     </children>
@@ -126,4 +129,3 @@
         <Insets bottom="20.0" left="20.0" right="20.0" top="20.0"/>
     </padding>
 </fx:root>
-

@@ -86,6 +86,8 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
     private Button btnMoreSettings;
     @FXML
     private Label lbRecvBytes;
+    @FXML
+    private Label lbSendBytes;
 
     private SerialSendPane rootPane;
 
@@ -109,6 +111,7 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
     // 串口参数设置
     private SerialPortSettings serialPortSettings;
     private long recvBytesBase = 0L;
+    private long sentBytesCount = 0L;
 
     // 串口参数设置对话框 key
     private static final String KEY_SERIAL_SETTINGS = "sendModeSerialSettings";
@@ -145,6 +148,7 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
         restoreFormState();
         bindFormStatePersistence();
         lbRecvBytes.setText(formatBytes(0L));
+        lbSendBytes.setText(formatBytes(0L));
 
         // 定时发送
         btnScheduleSend.selectedProperty().addListener((observable, oldValue, newValue) -> {
@@ -516,6 +520,10 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
                 logText = content;
             }
             int written = cbSerialList.getSelectedPort().writeBytes(data, data.length);
+            if (written > 0) {
+                sentBytesCount += written;
+                lbSendBytes.setText(formatBytes(sentBytesCount));
+            }
             if (written != data.length) {
                 LOG.warn("发送超时: {}/{} 字节", written, data.length);
                 ToastQueue.show(AppState.getStage(),
@@ -548,6 +556,12 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
                 taRecvArea,
                 cbHexDisplay,
                 cbTimeStampDisplay
+        );
+        serialSenderService.setOnSentBytesChanged(bytes ->
+                Platform.runLater(() -> {
+                    sentBytesCount += bytes;
+                    lbSendBytes.setText(formatBytes(sentBytesCount));
+                })
         );
         serialSenderService.start();
     }
@@ -743,6 +757,8 @@ public class SerialSendCtrl implements Initializable, ZipDataProvider {
     private void clearLogs() {
         taRecvArea.getArea().clear();
         recvBytesBase = 0L;
+        sentBytesCount = 0L;
+        lbSendBytes.setText(formatBytes(0L));
         if (serialReadService != null) {
             serialReadService.resetRecvBytesCount();
         } else {

@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static indi.lt.serialtool.data.BufferedDisplayLine.DataType.HEX;
 import static indi.lt.serialtool.data.BufferedDisplayLine.DataType.TXT;
@@ -38,6 +39,8 @@ public class SerialSenderService extends Service<BufferedDisplayLine> {
     private final MyStyleClassedTextArea taRecvArea;
     private final CheckBox cbHexDisplay;
     private final CheckBox cbTimeStampDisplay;
+
+    private Consumer<Long> onSentBytesChanged;
 
     public SerialSenderService(List<CommandTableView.CommandItem> commands,
                                SerialPort selectedPort, MyStyleClassedTextArea taRecvArea, CheckBox cbHexDisplay,
@@ -94,6 +97,11 @@ public class SerialSenderService extends Service<BufferedDisplayLine> {
                         }
 
                         int written = serialPort.writeBytes(data, data.length);
+                        if (written > 0) {
+                            if (onSentBytesChanged != null) {
+                                onSentBytesChanged.accept((long) written);
+                            }
+                        }
                         if (written != data.length) {
                             LOG.warn("定时发送超时: {}/{} 字节, cmd={}", written, data.length, currentCommand.getCommand());
                         } else {
@@ -121,6 +129,10 @@ public class SerialSenderService extends Service<BufferedDisplayLine> {
                 return null;
             }
         };
+    }
+
+    public void setOnSentBytesChanged(Consumer<Long> callback) {
+        this.onSentBytesChanged = callback;
     }
 
 }
