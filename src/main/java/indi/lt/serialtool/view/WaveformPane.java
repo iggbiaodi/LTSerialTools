@@ -19,10 +19,9 @@ import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
-import javafx.scene.Node;
-import javafx.scene.chart.LineChart;
-import javafx.scene.chart.NumberAxis;
-import javafx.scene.chart.XYChart;
+import javafx.geometry.VPos;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
@@ -35,11 +34,18 @@ import javafx.scene.control.Spinner;
 import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.Background;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.paint.Paint;
+import javafx.scene.shape.StrokeLineCap;
+import javafx.scene.text.Font;
+import javafx.scene.text.TextAlignment;
 import javafx.util.StringConverter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -75,7 +81,21 @@ public class WaveformPane extends BorderPane {
     private static final double MAX_X_ZOOM_FACTOR = 20.0;
     private static final double MIN_Y_ZOOM_FACTOR = 0.1;
     private static final double MAX_Y_ZOOM_FACTOR = 20.0;
-    private static final double WAVEFORM_STROKE_WIDTH = 1.2;
+    private static final double WAVEFORM_STROKE_WIDTH = 0.8;
+    private static final double CHART_MIN_HEIGHT = 320.0;
+    private static final double CHART_TITLE_HEIGHT = 34.0;
+    private static final double CHART_LEFT_MARGIN = 70.0;
+    private static final double CHART_RIGHT_MARGIN = 18.0;
+    private static final double CHART_BOTTOM_MARGIN = 48.0;
+    private static final double CHART_AXIS_LABEL_GAP = 20.0;
+    private static final String CHART_TITLE = "实时波形图";
+    private static final String X_AXIS_LABEL = "采样点";
+    private static final String Y_AXIS_LABEL = "数据值";
+    private static final Color DEFAULT_CHART_BACKGROUND_COLOR = Color.web("#f8f8f8");
+    private static final Color DEFAULT_CHART_GRID_COLOR = Color.web("#e8e8e8");
+    private static final Color DEFAULT_CHART_AXIS_COLOR = Color.web("#666666");
+    private static final Color DEFAULT_CHART_TEXT_COLOR = Color.web("#333333");
+    private static final double AXIS_TICK_ZERO_EPSILON = 1e-9;
     private static final String[] SERIES_COLORS = {
             "#ff0808",
             "#359e4d",
@@ -107,12 +127,15 @@ public class WaveformPane extends BorderPane {
     private final Label lbViewInfo = new Label("显示窗口: 0 点");
     private final JustifiedFlowPane legendBox = new JustifiedFlowPane(20, 10, 160);
 
-    private final NumberAxis xAxis = new NumberAxis();
-    private final NumberAxis yAxis = new NumberAxis();
-    private final LineChart<Number, Number> lineChart = new LineChart<>(xAxis, yAxis);
+    private final Canvas waveformCanvas = new Canvas();
+    private final Pane waveformCanvasPane = new Pane(waveformCanvas);
+    private final Region chartBackgroundColorProbe = new Region();
+    private final Region chartGridColorProbe = new Region();
+    private final Region chartAxisColorProbe = new Region();
+    private final Region chartTextColorProbe = new Region();
     private final ScrollBar sbTimeline = new ScrollBar();
 
-    private final List<XYChart.Series<Number, Number>> waveformSeries = new ArrayList<>();
+    private final List<WaveformSeriesData> waveformSeries = new ArrayList<>();
     private final List<WaveformLegendItem> legendItems = new ArrayList<>();
     private final List<Double> frameTimes = new ArrayList<>();
     private final ConcurrentLinkedQueue<FrameSnapshot> pendingFrames = new ConcurrentLinkedQueue<>();
@@ -131,6 +154,12 @@ public class WaveformPane extends BorderPane {
     private boolean updatingTimeline = false;
     private double xZoomFactor = 1.0;
     private double yZoomFactor = 1.0;
+    private double xLowerBound = -1.0;
+    private double xUpperBound = 1.0;
+    private double yLowerBound = -1.0;
+    private double yUpperBound = 1.0;
+    private double xTickUnit = 0.5;
+    private double yTickUnit = 0.5;
     private int nextDataIndex = 0;
 
     public WaveformPane() {
@@ -195,29 +224,24 @@ public class WaveformPane extends BorderPane {
         );
         viewControlBox.setAlignment(Pos.CENTER_LEFT);
 
-        xAxis.setLabel("采样点");
-        xAxis.setForceZeroInRange(false);
-        xAxis.setAutoRanging(false);
-        yAxis.setLabel("数据值");
-        yAxis.setForceZeroInRange(false);
-        yAxis.setAutoRanging(false);
         resetAxisBounds();
-
-        lineChart.setAnimated(false);
-        lineChart.setCreateSymbols(false);
-        lineChart.setLegendVisible(false);
-        lineChart.setHorizontalGridLinesVisible(true);
-        lineChart.setVerticalGridLinesVisible(false);
-        lineChart.setTitle("实时波形图");
-        lineChart.setMinHeight(320);
-        lineChart.setFocusTraversable(true);
-
-        // 图表入场景后，强设网格线样式（避免被主题 CSS 覆盖）
-        lineChart.sceneProperty().addListener((obs, oldScene, newScene) -> {
-            if (newScene != null) {
-                Platform.runLater(() -> applyGridLineStyle());
-            }
-        });
+        waveformCanvasPane.setMinHeight(CHART_MIN_HEIGHT);
+        waveformCanvasPane.setPrefHeight(CHART_MIN_HEIGHT);
+        waveformCanvasPane.setFocusTraversable(true);
+        waveformCanvas.widthProperty().bind(waveformCanvasPane.widthProperty());
+        waveformCanvas.heightProperty().bind(waveformCanvasPane.heightProperty());
+        waveformCanvas.widthProperty().addListener((obs, oldVal, newVal) -> drawWaveform());
+        waveformCanvas.heightProperty().addListener((obs, oldVal, newVal) -> drawWaveform());
+        configureThemeColorProbe(chartBackgroundColorProbe, "-color-bg-default");
+        configureThemeColorProbe(chartGridColorProbe, "-color-border-default");
+        configureThemeColorProbe(chartAxisColorProbe, "-color-fg-subtle");
+        configureThemeColorProbe(chartTextColorProbe, "-color-fg-default");
+        waveformCanvasPane.getChildren().addAll(
+                chartBackgroundColorProbe,
+                chartGridColorProbe,
+                chartAxisColorProbe,
+                chartTextColorProbe
+        );
 
         legendBox.setPadding(new Insets(8, 0, 0, 0));
 
@@ -230,9 +254,10 @@ public class WaveformPane extends BorderPane {
         HBox statusBar = new HBox(16, new Label("接收量:"), lbRecvBytes, createSpacer(), lbFrameInfo);
         statusBar.setAlignment(Pos.CENTER_LEFT);
 
-        VBox root = new VBox(10, topRow, waveformConfigBox, viewControlBox, lineChart, sbTimeline, legendBox, statusBar);
-        VBox.setVgrow(lineChart, Priority.ALWAYS);
+        VBox root = new VBox(10, topRow, waveformConfigBox, viewControlBox, waveformCanvasPane, sbTimeline, legendBox, statusBar);
+        VBox.setVgrow(waveformCanvasPane, Priority.ALWAYS);
         setCenter(root);
+        Platform.runLater(this::drawWaveform);
     }
 
     private void configurePointSpinner(Spinner<Integer> spinner, int defaultValue, IntSupplier fallbackSupplier) {
@@ -325,7 +350,7 @@ public class WaveformPane extends BorderPane {
         btnZoomYIn.setOnAction(event -> zoomYAxis(true));
         btnZoomYOut.setOnAction(event -> zoomYAxis(false));
         btnResetView.setOnAction(event -> resetView());
-        lineChart.setOnScroll(event -> {
+        waveformCanvasPane.setOnScroll(event -> {
             if (frameTimes.isEmpty()) {
                 return;
             }
@@ -420,7 +445,6 @@ public class WaveformPane extends BorderPane {
         yZoomFactor = 1.0;
         nextDataIndex = 0;
         runOnFx(() -> {
-            lineChart.getData().clear();
             legendBox.getChildren().clear();
             waveformSeries.clear();
             legendItems.clear();
@@ -462,8 +486,8 @@ public class WaveformPane extends BorderPane {
         ensureSeriesCount(values.length);
         int currentIndex = nextDataIndex++;
         for (int i = 0; i < values.length; i++) {
-            XYChart.Series<Number, Number> series = waveformSeries.get(i);
-            series.getData().add(new XYChart.Data<>(currentIndex, values[i]));
+            WaveformSeriesData series = waveformSeries.get(i);
+            series.points().add(new WaveformPoint(currentIndex, values[i]));
             trimSeries(series);
             legendItems.get(i).setCurrentValue(values[i]);
         }
@@ -486,23 +510,20 @@ public class WaveformPane extends BorderPane {
         int targetCount = Math.min(count, MAX_WAVE_COUNT);
         while (waveformSeries.size() < targetCount) {
             int channelIndex = waveformSeries.size();
-            XYChart.Series<Number, Number> series = new XYChart.Series<>();
-            series.setName("波形" + (channelIndex + 1));
+            WaveformSeriesData series = new WaveformSeriesData("波形" + (channelIndex + 1));
             waveformSeries.add(series);
-            lineChart.getData().add(series);
             WaveformLegendItem legendItem = new WaveformLegendItem(channelIndex, series);
             legendItems.add(legendItem);
             legendBox.getChildren().add(legendItem.container());
-            bindSeriesVisibility(series, legendItem);
         }
     }
 
-    private void trimSeries(XYChart.Series<Number, Number> series) {
-        int overflow = series.getData().size() - maxPoints;
+    private void trimSeries(WaveformSeriesData series) {
+        int overflow = series.points().size() - maxPoints;
         if (overflow <= 0) {
             return;
         }
-        series.getData().remove(0, overflow);
+        series.points().subList(0, overflow).clear();
     }
 
     private void trimFrameTimes() {
@@ -545,7 +566,6 @@ public class WaveformPane extends BorderPane {
         nextDataIndex = 0;
         runOnFx(() -> {
             frameTimes.clear();
-            lineChart.getData().clear();
             legendBox.getChildren().clear();
             waveformSeries.clear();
             legendItems.clear();
@@ -702,6 +722,7 @@ public class WaveformPane extends BorderPane {
             resetAxisBounds();
             updateTimeline(0, 0);
             lbViewInfo.setText("显示窗口: 0 点");
+            drawWaveform();
             return;
         }
 
@@ -716,24 +737,25 @@ public class WaveformPane extends BorderPane {
 
         double lowerX;
         double upperX;
-        if (waveformSeries.isEmpty() || waveformSeries.get(0).getData().isEmpty()) {
+        if (waveformSeries.isEmpty() || waveformSeries.get(0).points().isEmpty()) {
             lowerX = viewStartIndex;
             upperX = endIndex;
         } else {
-            List<XYChart.Data<Number, Number>> data = waveformSeries.get(0).getData();
+            List<WaveformPoint> data = waveformSeries.get(0).points();
             int dataStart = Math.min(viewStartIndex, data.size() - 1);
             int dataEnd = Math.min(endIndex, data.size() - 1);
-            lowerX = data.get(Math.max(0, dataStart)).getXValue().doubleValue();
-            upperX = data.get(Math.max(0, dataEnd)).getXValue().doubleValue();
+            lowerX = data.get(Math.max(0, dataStart)).xIndex();
+            upperX = data.get(Math.max(0, dataEnd)).xIndex();
         }
         double xSpan = Math.max(upperX - lowerX, 1);
         double xPadding = Math.max(xSpan * 0.02, 0.5);
-        xAxis.setLowerBound(lowerX - xPadding);
-        xAxis.setUpperBound(upperX + xPadding);
+        xLowerBound = lowerX - xPadding;
+        xUpperBound = upperX + xPadding;
 
         updateYAxis(lowerX, upperX);
         updateTimeline(windowPointCount, maxStart);
         updateTickUnits();
+        drawWaveform();
         lbViewInfo.setText(
                 "显示窗口: " + windowPointCount + " 点  X缩放:" + formatZoomText(xZoomFactor)
                         + "  Y缩放:" + formatZoomText(yZoomFactor)
@@ -744,22 +766,22 @@ public class WaveformPane extends BorderPane {
         double min = Double.POSITIVE_INFINITY;
         double max = Double.NEGATIVE_INFINITY;
 
-        for (XYChart.Series<Number, Number> series : waveformSeries) {
+        for (WaveformSeriesData series : waveformSeries) {
             int seriesIndex = waveformSeries.indexOf(series);
             if (seriesIndex >= 0 && seriesIndex < legendItems.size() && !legendItems.get(seriesIndex).isVisible()) {
                 continue;
             }
-            List<XYChart.Data<Number, Number>> data = series.getData();
+            List<WaveformPoint> data = series.points();
             for (int i = data.size() - 1; i >= 0; i--) {
-                XYChart.Data<Number, Number> point = data.get(i);
-                double x = point.getXValue().doubleValue();
+                WaveformPoint point = data.get(i);
+                double x = point.xIndex();
                 if (x > upperX) {
                     continue;
                 }
                 if (x < lowerX) {
                     break;
                 }
-                double y = point.getYValue().doubleValue();
+                double y = point.value();
                 if (y < min) {
                     min = y;
                 }
@@ -770,8 +792,8 @@ public class WaveformPane extends BorderPane {
         }
 
         if (!Double.isFinite(min) || !Double.isFinite(max)) {
-            yAxis.setLowerBound(0);
-            yAxis.setUpperBound(1);
+            yLowerBound = 0;
+            yUpperBound = 1;
             return;
         }
 
@@ -783,8 +805,8 @@ public class WaveformPane extends BorderPane {
             halfSpan = ((max - min) / 2.0) * 1.1 * yZoomFactor;
         }
         halfSpan = Math.max(halfSpan, 0.5);
-        yAxis.setLowerBound(center - halfSpan);
-        yAxis.setUpperBound(center + halfSpan);
+        yLowerBound = center - halfSpan;
+        yUpperBound = center + halfSpan;
     }
 
     private void updateTimeline(int windowPointCount, int maxStart) {
@@ -808,24 +830,25 @@ public class WaveformPane extends BorderPane {
     }
 
     private void resetAxisBounds() {
-        xAxis.setLowerBound(-1);
-        xAxis.setUpperBound(1);
-        yAxis.setLowerBound(-1);
-        yAxis.setUpperBound(1);
+        xLowerBound = -1;
+        xUpperBound = 1;
+        yLowerBound = -1;
+        yUpperBound = 1;
+        updateTickUnits();
     }
 
     /**
      * 根据当前可见范围动态设置坐标轴刻度间距，保持网格线稀疏（约5~8条）。
      */
     private void updateTickUnits() {
-        double xRange = xAxis.getUpperBound() - xAxis.getLowerBound();
-        double yRange = yAxis.getUpperBound() - yAxis.getLowerBound();
+        double xRange = xUpperBound - xLowerBound;
+        double yRange = yUpperBound - yLowerBound;
 
         if (xRange > 0) {
-            xAxis.setTickUnit(niceTick(xRange, 6));
+            xTickUnit = niceTick(xRange, 6);
         }
         if (yRange > 0) {
-            yAxis.setTickUnit(niceTick(yRange, 6));
+            yTickUnit = niceTick(yRange, 6);
         }
     }
 
@@ -849,68 +872,191 @@ public class WaveformPane extends BorderPane {
         return nice * exp;
     }
 
-    /**
-     * 通过 lookup 直接设置网格线样式，确保不被主题 CSS 覆盖。
-     */
-    private void applyGridLineStyle() {
-        // 图表背景
-        Node bg = lineChart.lookup(".chart-plot-background");
-//        // 水平网格线
-//        for (Node node : lineChart.lookupAll(".chart-horizontal-grid-lines")) {
-//            node.setStyle("-fx-stroke: #e8e8e8; -fx-stroke-width: 0.5;");
-//        }
-//        // 垂直网格线（虽然已关闭，但以防残留）
-//        for (Node node : lineChart.lookupAll(".chart-vertical-grid-lines")) {
-//            node.setStyle("-fx-stroke: #e8e8e8; -fx-stroke-width: 0.5;");
-//        }
+    private void drawWaveform() {
+        double width = waveformCanvas.getWidth();
+        double height = waveformCanvas.getHeight();
+        GraphicsContext gc = waveformCanvas.getGraphicsContext2D();
+        gc.clearRect(0, 0, width, height);
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+
+        double plotLeft = Math.min(CHART_LEFT_MARGIN, Math.max(42.0, width * 0.28));
+        double plotRight = Math.max(plotLeft + 1.0, width - CHART_RIGHT_MARGIN);
+        double plotTop = CHART_TITLE_HEIGHT;
+        double plotBottom = Math.max(plotTop + 1.0, height - CHART_BOTTOM_MARGIN);
+        double plotWidth = plotRight - plotLeft;
+        double plotHeight = plotBottom - plotTop;
+        ChartColors colors = resolveChartColors();
+
+        gc.setFont(Font.getDefault());
+        gc.setTextBaseline(VPos.CENTER);
+        drawChartText(gc, CHART_TITLE, width / 2.0, CHART_TITLE_HEIGHT / 2.0, TextAlignment.CENTER, colors.text());
+
+        gc.setFill(colors.background());
+        gc.fillRect(plotLeft, plotTop, plotWidth, plotHeight);
+
+        drawAxesAndGrid(gc, plotLeft, plotTop, plotRight, plotBottom, colors);
+        drawSeries(gc, plotLeft, plotTop, plotRight, plotBottom);
+    }
+
+    private void drawAxesAndGrid(
+            GraphicsContext gc,
+            double plotLeft,
+            double plotTop,
+            double plotRight,
+            double plotBottom,
+            ChartColors colors
+    ) {
+        double plotWidth = plotRight - plotLeft;
+        double plotHeight = plotBottom - plotTop;
+        double yRange = Math.max(yUpperBound - yLowerBound, 0.000001);
+        double xRange = Math.max(xUpperBound - xLowerBound, 0.000001);
+
+        gc.setLineWidth(0.5);
+        gc.setStroke(colors.grid());
+        for (double tick = firstTick(yLowerBound, yTickUnit); tick <= yUpperBound + yTickUnit * 0.5; tick += yTickUnit) {
+            double y = plotBottom - ((tick - yLowerBound) / yRange) * plotHeight;
+            gc.strokeLine(plotLeft, y, plotRight, y);
+            drawChartText(gc, formatAxisTick(tick), plotLeft - 8.0, y, TextAlignment.RIGHT, colors.text());
+        }
+
+        gc.setStroke(colors.axis());
+        gc.setLineWidth(1.0);
+        gc.strokeLine(plotLeft, plotTop, plotLeft, plotBottom);
+        gc.strokeLine(plotLeft, plotBottom, plotRight, plotBottom);
+
+        for (double tick = firstTick(xLowerBound, xTickUnit); tick <= xUpperBound + xTickUnit * 0.5; tick += xTickUnit) {
+            double x = plotLeft + ((tick - xLowerBound) / xRange) * plotWidth;
+            gc.strokeLine(x, plotBottom, x, plotBottom + 4.0);
+            drawChartText(gc, formatAxisTick(tick), x, plotBottom + 16.0, TextAlignment.CENTER, colors.text());
+        }
+
+        drawChartText(
+                gc,
+                X_AXIS_LABEL,
+                (plotLeft + plotRight) / 2.0,
+                plotBottom + CHART_AXIS_LABEL_GAP + 12.0,
+                TextAlignment.CENTER,
+                colors.text()
+        );
+        gc.save();
+        gc.translate(16.0, (plotTop + plotBottom) / 2.0);
+        gc.rotate(-90.0);
+        drawChartText(gc, Y_AXIS_LABEL, 0, 0, TextAlignment.CENTER, colors.text());
+        gc.restore();
+    }
+
+    private void drawSeries(GraphicsContext gc, double plotLeft, double plotTop, double plotRight, double plotBottom) {
+        double xRange = xUpperBound - xLowerBound;
+        double yRange = yUpperBound - yLowerBound;
+        if (xRange <= 0 || yRange <= 0) {
+            return;
+        }
+
+        gc.save();
+        gc.beginPath();
+        gc.rect(plotLeft, plotTop, plotRight - plotLeft, plotBottom - plotTop);
+        gc.clip();
+        gc.setLineWidth(WAVEFORM_STROKE_WIDTH);
+        gc.setLineCap(StrokeLineCap.ROUND);
+
+        for (int i = 0; i < waveformSeries.size(); i++) {
+            if (i < legendItems.size() && !legendItems.get(i).isVisible()) {
+                continue;
+            }
+            WaveformSeriesData series = waveformSeries.get(i);
+            boolean drawing = false;
+            gc.setStroke(Color.web(getSeriesColor(i)));
+            gc.beginPath();
+            for (WaveformPoint point : series.points()) {
+                double xValue = point.xIndex();
+                if (xValue < xLowerBound) {
+                    continue;
+                }
+                if (xValue > xUpperBound) {
+                    break;
+                }
+                double x = plotLeft + ((xValue - xLowerBound) / xRange) * (plotRight - plotLeft);
+                double y = plotBottom - ((point.value() - yLowerBound) / yRange) * (plotBottom - plotTop);
+                if (!drawing) {
+                    gc.moveTo(x, y);
+                    drawing = true;
+                } else {
+                    gc.lineTo(x, y);
+                }
+            }
+            if (drawing) {
+                gc.stroke();
+            }
+        }
+        gc.restore();
+    }
+
+    private void drawChartText(GraphicsContext gc, String text, double x, double y, TextAlignment alignment, Color textColor) {
+        gc.setFill(textColor);
+        gc.setTextAlign(alignment);
+        gc.fillText(text, x, y);
+    }
+
+    private void configureThemeColorProbe(Region probe, String lookedUpColor) {
+        probe.setManaged(false);
+        probe.setMouseTransparent(true);
+        probe.setOpacity(0);
+        probe.setMinSize(0, 0);
+        probe.setPrefSize(0, 0);
+        probe.setMaxSize(0, 0);
+        probe.setStyle("-fx-background-color: " + lookedUpColor + ";");
+        probe.backgroundProperty().addListener((obs, oldVal, newVal) -> Platform.runLater(this::drawWaveform));
+    }
+
+    private ChartColors resolveChartColors() {
+        return new ChartColors(
+                resolveThemeColor(chartBackgroundColorProbe, DEFAULT_CHART_BACKGROUND_COLOR),
+                resolveThemeColor(chartGridColorProbe, DEFAULT_CHART_GRID_COLOR),
+                resolveThemeColor(chartAxisColorProbe, DEFAULT_CHART_AXIS_COLOR),
+                resolveThemeColor(chartTextColorProbe, DEFAULT_CHART_TEXT_COLOR)
+        );
+    }
+
+    private Color resolveThemeColor(Region probe, Color fallback) {
+        probe.applyCss();
+        Background background = probe.getBackground();
+        if (background == null || background.getFills().isEmpty()) {
+            return fallback;
+        }
+        Paint fill = background.getFills().get(0).getFill();
+        return fill instanceof Color color ? color : fallback;
+    }
+
+    private static double firstTick(double lowerBound, double tickUnit) {
+        if (tickUnit <= 0) {
+            return lowerBound;
+        }
+        return Math.ceil(lowerBound / tickUnit) * tickUnit;
+    }
+
+    private String formatAxisTick(double value) {
+        double normalizedValue = normalizeAxisTick(value);
+        if (Math.abs(normalizedValue) >= 1_000_000) {
+            return String.format(Locale.ROOT, "%.2e", normalizedValue);
+        }
+        if (Math.rint(normalizedValue) == normalizedValue) {
+            return String.format(Locale.ROOT, "%.0f", normalizedValue);
+        }
+        String text = String.format(Locale.ROOT, Math.abs(normalizedValue) < 1 ? "%.6f" : "%.3f", normalizedValue);
+        while (text.contains(".") && text.endsWith("0")) {
+            text = text.substring(0, text.length() - 1);
+        }
+        return text.endsWith(".") ? text.substring(0, text.length() - 1) : text;
+    }
+
+    private static double normalizeAxisTick(double value) {
+        return Math.abs(value) < AXIS_TICK_ZERO_EPSILON ? 0.0 : value;
     }
 
     private String formatZoomText(double factor) {
         return String.format("%.2f", 1.0 / factor) + "x";
-    }
-
-    private void bindSeriesVisibility(XYChart.Series<Number, Number> series, WaveformLegendItem legendItem) {
-        series.nodeProperty().addListener((obs, oldNode, newNode) -> {
-            applySeriesLineStyle(series);
-            applySeriesVisibility(series, legendItem);
-        });
-        applySeriesLineStyle(series);
-        applySeriesVisibility(series, legendItem);
-    }
-
-    private void applySeriesVisibility(XYChart.Series<Number, Number> series, WaveformLegendItem legendItem) {
-        boolean visible = legendItem.isVisible();
-        Node seriesNode = series.getNode();
-        if (seriesNode != null) {
-            seriesNode.setVisible(visible);
-            seriesNode.setManaged(visible);
-        }
-        for (XYChart.Data<Number, Number> data : series.getData()) {
-            Node dataNode = data.getNode();
-            if (dataNode != null) {
-                dataNode.setVisible(visible);
-                dataNode.setManaged(visible);
-            }
-        }
-    }
-
-    private void applySeriesLineStyle(XYChart.Series<Number, Number> series) {
-        Node seriesNode = series.getNode();
-        if (seriesNode == null) {
-            return;
-        }
-        Node lineNode = seriesNode.lookup(".chart-series-line");
-        if (lineNode == null) {
-            Platform.runLater(() -> applySeriesLineStyle(series));
-            return;
-        }
-        int idx = waveformSeries.indexOf(series);
-        String color = getSeriesColor(idx);
-        lineNode.setStyle("-fx-stroke: " + color + "; -fx-stroke-width: " + WAVEFORM_STROKE_WIDTH + "px;"
-                + " -fx-stroke-line-cap: round; -fx-stroke-line-join: round;");
-        if (lineNode instanceof javafx.scene.shape.Path) {
-            ((javafx.scene.shape.Path) lineNode).setSmooth(true);
-        }
     }
 
     private String formatWaveValue(double value) {
@@ -959,13 +1105,25 @@ public class WaveformPane extends BorderPane {
     private record FrameSnapshot(double timeSeconds, WaveformProtocolParser.FrameData frameData) {
     }
 
+    private record ChartColors(Color background, Color grid, Color axis, Color text) {
+    }
+
+    private record WaveformPoint(int xIndex, double value) {
+    }
+
+    private record WaveformSeriesData(String name, List<WaveformPoint> points) {
+        private WaveformSeriesData(String name) {
+            this(name, new ArrayList<>());
+        }
+    }
+
     private final class WaveformLegendItem {
         private final HBox container;
         private final CheckBox checkBox;
         private final TextField valueTextField;
-        private final XYChart.Series<Number, Number> series;
+        private final WaveformSeriesData series;
 
-        private WaveformLegendItem(int channelIndex, XYChart.Series<Number, Number> series) {
+        private WaveformLegendItem(int channelIndex, WaveformSeriesData series) {
             this.series = series;
             Region colorSwatch = new Region();
             colorSwatch.setPrefSize(12, 12);
@@ -997,7 +1155,6 @@ public class WaveformPane extends BorderPane {
             this.container.setAlignment(Pos.CENTER_LEFT);
 
             this.checkBox.selectedProperty().addListener((obs, oldVal, selected) -> {
-                applySeriesVisibility(this.series, this);
                 refreshViewport();
             });
         }
