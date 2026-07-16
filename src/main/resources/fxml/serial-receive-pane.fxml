@@ -29,11 +29,11 @@
                 </FlowPane>
                 <HBox alignment="CENTER_LEFT" spacing="10.0">
                     <children>
-                        <Label text="过滤关键字:" />
+                        <Label text="过滤关键字:" minWidth="-Infinity"/>
                         <TextField fx:id="tfKeyWord" promptText="关键字以“|”隔开" />
-                        <CheckBox fx:id="cbHexDisplay" mnemonicParsing="false" text="HEX显示" />
-                        <CheckBox fx:id="cbTimeDisplay" mnemonicParsing="false" text="时间戳显示" />
-                        <CheckBox fx:id="cbHighlightKeyword" mnemonicParsing="false" prefHeight="17.0" prefWidth="100.0" text="高亮关键字" />
+                        <CheckBox fx:id="cbHexDisplay" mnemonicParsing="false" text="HEX显示" minWidth="-Infinity"/>
+                        <CheckBox fx:id="cbTimeDisplay" mnemonicParsing="false" text="时间戳显示" minWidth="-Infinity"/>
+                        <CheckBox fx:id="cbHighlightKeyword" mnemonicParsing="false" minWidth="-Infinity" text="高亮关键字" />
                     </children>
                 </HBox>
                 <HBox spacing="10.0">
