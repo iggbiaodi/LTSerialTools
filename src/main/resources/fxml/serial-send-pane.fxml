@@ -11,9 +11,9 @@
                     <children>
                         <HBox alignment="CENTER_LEFT" spacing="10.0">
                             <children>
-                                <Label text="显示区："/>
-                                <Button mnemonicParsing="false" text="恢复自动滚动" onAction="#restoreScrolling"/>
-                                <Button mnemonicParsing="false" text="清空显示" onAction="#clearLogs"/>
+                                <Label text="显示区：" minWidth="-Infinity"/>
+                                <Button mnemonicParsing="false" text="恢复自动滚动" onAction="#restoreScrolling" minWidth="-Infinity"/>
+                                <Button mnemonicParsing="false" text="清空显示" onAction="#clearLogs" minWidth="-Infinity"/>
                                 <Region HBox.hgrow="ALWAYS"/>
                             </children>
                         </HBox>
@@ -50,16 +50,16 @@
                                 <VBox HBox.hgrow="NEVER">
                                     <children>
                                         <CheckBox fx:id="cbHexDisplay" maxHeight="1.7976931348623157E308"
-                                                  mnemonicParsing="false" text="HEX显示"/>
+                                                  mnemonicParsing="false" text="HEX显示" minWidth="-Infinity"/>
                                         <Region minWidth="0.0" VBox.vgrow="ALWAYS"/>
                                         <CheckBox fx:id="cbHexSend" maxHeight="1.7976931348623157E308" mnemonicParsing="false"
-                                                  text="HEX发送"/>
+                                                  text="HEX发送" minWidth="-Infinity"/>
                                         <Region VBox.vgrow="ALWAYS"/>
                                         <CheckBox fx:id="lineBreak" maxHeight="1.7976931348623157E308"
-                                                  mnemonicParsing="false" text="自动换行"/>
+                                                  mnemonicParsing="false" text="自动换行" minWidth="-Infinity"/>
                                         <Region VBox.vgrow="ALWAYS"/>
                                         <CheckBox fx:id="cbTimeStampDisplay" maxHeight="1.7976931348623157E308"
-                                                  mnemonicParsing="false" text="时间戳显示"/>
+                                                  mnemonicParsing="false" text="时间戳显示" minWidth="-Infinity"/>
                                     </children>
                                 </VBox>
                                 <VBox prefHeight="200.0" prefWidth="100.0" spacing="10.0" HBox.hgrow="ALWAYS">
@@ -69,9 +69,9 @@
                                         <HBox alignment="CENTER_RIGHT" prefHeight="100.0" prefWidth="200.0"
                                               spacing="10.0">
                                             <children>
-                                                <Button mnemonicParsing="false" text="清空发送"/>
+                                                <Button mnemonicParsing="false" text="清空发送" minWidth="-Infinity"/>
                                                 <Button fx:id="btnSend" mnemonicParsing="false" styleClass="accent"
-                                                        text="发送"/>
+                                                        text="发送" minWidth="-Infinity"/>
                                             </children>
                                         </HBox>
                                     </children>
@@ -83,10 +83,10 @@
                         </HBox>
                         <HBox alignment="CENTER_LEFT">
                             <children>
-                                <Label text="接收量：" />
+                                <Label text="接收量：" minWidth="-Infinity" />
                                 <Label fx:id="lbRecvBytes" text="0(0)B"/>
                                 <Region HBox.hgrow="ALWAYS"/>
-                                <Label text="发送量：" />
+                                <Label text="发送量：" minWidth="-Infinity"/>
                                 <Label fx:id="lbSendBytes" text="0(0)B"/>
                             </children>
                         </HBox>
@@ -104,9 +104,9 @@
                     <children>
                         <HBox alignment="CENTER_LEFT">
                             <children>
-                                <Label maxWidth="1.7976931348623157E308" text="自定义指令区：" HBox.hgrow="ALWAYS"/>
+                                <Label maxWidth="1.7976931348623157E308" text="自定义指令区：" HBox.hgrow="ALWAYS" minWidth="-Infinity"/>
                                 <SerialToggleButton fx:id="btnScheduleSend" mnemonicParsing="false" text="开启定时发送"
-                                                    selectedText="停止定时发送" unSelectedText="开启定时发送"/>
+                                                    selectedText="停止定时发送" unSelectedText="开启定时发送" minWidth="-Infinity"/>
                             </children>
                         </HBox>
                         <HBox alignment="CENTER_LEFT" spacing="10.0">
