@@ -4,9 +4,8 @@
 
 **一款简洁优雅的跨平台串口调试工具**
 
-[![GitHub release](https://img.shields.io/github/v/release/yourusername/LTSerialTool?include_prereleases&color=blue)](https://github.com/yourusername/LTSerialTool/releases)
-[![License](https://img.shields.io/github/license/yourusername/LTSerialTool)](LICENSE)
-[![Build Status](https://github.com/yourusername/LTSerialTool/workflows/Java%20CI%20with%20Gradle/badge.svg)](https://github.com/yourusername/LTSerialTool/actions)
+[![GitHub release](https://img.shields.io/github/v/release/iggbiaodi/LTSerialTools?include_prereleases&color=blue)](https://github.com/iggbiaodi/LTSerialTools/releases)
+[![License](https://img.shields.io/github/license/iggbiaodi/LTSerialTools)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-17+-orange)](https://www.oracle.com/java/)
 [![JavaFX](https://img.shields.io/badge/JavaFX-21-brightgreen)](https://openjfx.io/)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-purple)](https://kotlinlang.org/)
@@ -93,7 +92,7 @@
 
 #### 方式一：下载发布版本（推荐）
 
-1. 前往 [Releases](https://github.com/yourusername/LTSerialTool/releases) 页面
+1. 前往 [Releases](https://github.com/iggbiaodi/LTSerialTools/releases) 页面
 2. 下载对应平台的安装包：
    - **Windows**: `LTSerialTool-1.0.0-windows.zip`
    - **Linux**: `LTSerialTool-1.0.0-linux.tar.gz`
@@ -104,7 +103,7 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/LTSerialTool.git
+git clone https://github.com/iggbiaodi/LTSerialTools.git
 cd LTSerialTool
 
 # 使用 Gradle 构建
