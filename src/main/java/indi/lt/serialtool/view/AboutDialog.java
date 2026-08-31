@@ -15,8 +15,10 @@ import javafx.scene.control.DialogPane;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
+import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Window;
@@ -31,6 +33,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 public class AboutDialog extends Dialog<Void> {
@@ -39,6 +42,8 @@ public class AboutDialog extends Dialog<Void> {
     private static final String GITHUB_URL = "https://github.com/iggbiaodi/LTSerialTools";
     private static final String LATEST_RELEASE_API = "https://api.github.com/repos/iggbiaodi/LTSerialTools/releases/latest";
     private static final String RELEASES_URL = GITHUB_URL + "/releases";
+    private static final String FEEDBACK_QR_IMAGE = "/image/wechat-feedback-qr.jpg";
+    private static final double FEEDBACK_QR_SIZE = 96;
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
     private final Label versionLabel = createAboutLabel("版本: 正在获取...");
@@ -73,31 +78,38 @@ public class AboutDialog extends Dialog<Void> {
     }
 
     private VBox createContent() {
-        VBox content = new VBox(8);
+        VBox content = new VBox(6);
         content.setAlignment(Pos.TOP_CENTER);
-        content.setPadding(new Insets(10, 12, 0, 12));
+        content.setPadding(new Insets(8, 12, 0, 12));
         content.setPrefWidth(670);
         content.setStyle("-fx-background-color: -color-bg-default;");
 
+        ImageView logoView = new ImageView(FontSettingsManager.loadAppIcon());
+        logoView.setFitWidth(36);
+        logoView.setFitHeight(36);
+        logoView.setPreserveRatio(true);
+
         Label titleLabel = new Label(BaseStage.APP_NAME);
         titleLabel.setAlignment(Pos.CENTER);
-        titleLabel.setMaxWidth(Double.MAX_VALUE);
         titleLabel.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: -color-fg-default;");
+
+        HBox titleBox = new HBox(10, logoView, titleLabel);
+        titleBox.setAlignment(Pos.CENTER);
+        titleBox.setMaxWidth(Double.MAX_VALUE);
 
         Separator separator = new Separator();
         separator.setMaxWidth(Double.MAX_VALUE);
 
-        ImageView logoView = new ImageView(FontSettingsManager.loadAppIcon());
-        logoView.setFitWidth(40);
-        logoView.setFitHeight(40);
-        logoView.setPreserveRatio(true);
-        VBox.setMargin(logoView, new Insets(0, 0, 4, 0));
-
-        VBox infoBox = new VBox(12);
-        infoBox.setAlignment(Pos.TOP_CENTER);
-        infoBox.setPadding(new Insets(6, 18, 12, 18));
+        HBox infoBox = new HBox(14);
+        infoBox.setAlignment(Pos.CENTER);
+        infoBox.setPadding(new Insets(6, 16, 12, 16));
         infoBox.setMaxWidth(Double.MAX_VALUE);
-        infoBox.setStyle("-fx-background-color: -color-bg-default; -fx-border-color: -color-border-default; -fx-border-width: 1 0 0 0;");
+        infoBox.setStyle("-fx-background-color: -color-bg-default;");
+
+        VBox textInfoBox = new VBox(9);
+        textInfoBox.setAlignment(Pos.TOP_CENTER);
+        textInfoBox.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(textInfoBox, Priority.ALWAYS);
 
         Label authorTitle = createAboutLabel("关于作者:");
         authorTitle.setStyle(authorTitle.getStyle() + " -fx-font-weight: bold;");
@@ -114,7 +126,7 @@ public class AboutDialog extends Dialog<Void> {
         HBox actionBox = new HBox(10, openGithubButton, checkUpdateButton);
         actionBox.setAlignment(Pos.CENTER);
 
-        infoBox.getChildren().addAll(
+        textInfoBox.getChildren().addAll(
                 createAboutLabel("LTSerialTool是一款功能实用的串口调试助手"),
                 createAboutLabel("支持多串口接收、关键字过滤&&高亮、自定义背景、串口发送、自定义添加指令、定时发送、接收&&发送数据量统计、波形图实时绘制等功能。"),
                 authorTitle,
@@ -125,9 +137,33 @@ public class AboutDialog extends Dialog<Void> {
                 updateDateLabel,
                 actionBox
         );
+        infoBox.getChildren().addAll(textInfoBox, createFeedbackQrBox());
 
-        content.getChildren().addAll(titleLabel, separator, logoView, infoBox);
+        content.getChildren().addAll(titleBox, separator, infoBox);
         return content;
+    }
+
+    private VBox createFeedbackQrBox() {
+        ImageView qrView = new ImageView(new Image(Objects.requireNonNull(AboutDialog.class.getResourceAsStream(FEEDBACK_QR_IMAGE))));
+        qrView.setFitWidth(FEEDBACK_QR_SIZE);
+        qrView.setFitHeight(FEEDBACK_QR_SIZE);
+        qrView.setPreserveRatio(true);
+        qrView.setSmooth(false);
+
+        Label titleLabel = createAboutLabel("微信公众号");
+        titleLabel.setStyle(titleLabel.getStyle() + " -fx-font-size: 12px; -fx-font-weight: bold;");
+
+        Label promptLabel = createAboutLabel("反馈与更新通知");
+        promptLabel.setStyle(promptLabel.getStyle() + " -fx-font-size: 12px;");
+
+        VBox qrBox = new VBox(4, qrView, titleLabel, promptLabel);
+        qrBox.setAlignment(Pos.CENTER);
+        qrBox.setMinWidth(122);
+        qrBox.setPrefWidth(122);
+        qrBox.setMaxWidth(122);
+        qrBox.setPadding(new Insets(0, 0, 0, 10));
+        qrBox.setStyle("-fx-border-color: -color-border-default; -fx-border-width: 0 0 0 1;");
+        return qrBox;
     }
 
     private void refreshReleaseInfo(boolean showResult) {
