@@ -22,7 +22,7 @@ apply plugin: 'io.github.fvarrui.javapackager.plugin'
 
 
 group 'indi.lt.serialtool'
-version '2.0.0'
+version '2.0.1'
 
 repositories {
     mavenLocal()
@@ -62,7 +62,8 @@ tasks.withType(KotlinCompile).configureEach {
 
 application {
     mainClass = 'indi.lt.serialtool.Main'
-    applicationDefaultJvmArgs = ["--enable-preview", "-Djavafx.enablePreview=true"]
+    applicationDefaultJvmArgs = ["--enable-preview", "-Djavafx.enablePreview=true", "-Dprism.lcdtext=false",
+                                 "-Dprism.text=t2k"]
 }
 
 javafx {
@@ -119,6 +120,8 @@ tasks.register('packageMyApp', PackageTask) {
     ]
     vmArgs = [
             "-Djavafx.enablePreview=true",
+            "-Dprism.lcdtext=false",
+            "-Dprism.text=t2k",
             "--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED"
     ]
     bundleJre = true
