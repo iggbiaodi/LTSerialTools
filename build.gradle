@@ -1,4 +1,6 @@
 import io.github.fvarrui.javapackager.gradle.PackageTask
+import io.github.fvarrui.javapackager.model.HeaderType
+import io.github.fvarrui.javapackager.model.WindowsExeCreationTool
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 buildscript {
@@ -34,6 +36,28 @@ ext {
     versions = [
             'jfx': '25.0.2'
     ]
+}
+
+def generatedResourcesDir = layout.buildDirectory.dir('generated/resources/main')
+
+tasks.register('generateAppVersion') {
+    def versionFile = generatedResourcesDir.map { it.file('app.properties') }
+    outputs.file(versionFile)
+    doLast {
+        def outputFile = versionFile.get().asFile
+        outputFile.parentFile.mkdirs()
+        outputFile.text = "app.version=${project.version}\n"
+    }
+}
+
+sourceSets {
+    main {
+        resources.srcDir(generatedResourcesDir)
+    }
+}
+
+tasks.named('processResources') {
+    dependsOn(tasks.named('generateAppVersion'))
 }
 
 java {
@@ -77,6 +101,14 @@ def platform =
         os.isWindows() ? "win" :
                 os.isMacOsX() ? (arch.contains("aarch64") || arch.contains("arm64") ? "mac-aarch64" : "mac") :
                         /* linux */ (arch.contains("aarch64") || arch.contains("arm64") ? "linux-aarch64" : "linux")
+def appDisplayName = 'LTSerialTool'
+def appExecutableName = "${appDisplayName}.exe"
+def winFileVersionParts = project.version.toString()
+        .split('-')[0]
+        .tokenize('.')
+        .collect { it.isInteger() ? Math.max(it.toInteger(), 0).toString() : '0' }
+def winFileVersion = (winFileVersionParts + ['0', '0', '0', '0']).take(4).join('.')
+def winIconFile = layout.projectDirectory.file('assets/windows/serial-tool.ico').asFile
 
 dependencies {
     implementation('org.kordamp.ikonli:ikonli-javafx:12.3.1')
@@ -109,6 +141,10 @@ jar {
 
 tasks.register('packageMyApp', PackageTask) {
     dependsOn clean, jar
+    displayName = appDisplayName
+    appDescription = "${appDisplayName} desktop application"
+    appName = appDisplayName
+    organizationName = 'LTSerialTool Contributors'
     // mandatory
     mainClass = application.mainClass.get()
     // optional
@@ -128,7 +164,37 @@ tasks.register('packageMyApp', PackageTask) {
     generateInstaller = false
     // 是否需要管理员权限
     administratorRequired = false
-    winConfig { createZipball = true }
+    winConfig {
+        createZipball = true
+        headerType = HeaderType.gui
+        exeCreationTool = WindowsExeCreationTool.winrun4j
+        icoFile = winIconFile
+
+        fileDescription = appDisplayName
+        productName = appDisplayName
+        internalName = appDisplayName
+        originalFilename = appExecutableName
+        companyName = 'LTSerialTool Contributors'
+
+        fileVersion = winFileVersion
+        productVersion = winFileVersion
+        txtFileVersion = project.version.toString()
+        txtProductVersion = project.version.toString()
+
+        shortcutName = appDisplayName
+    }
+
+    doLast {
+        def runnableJarName = "${appDisplayName}-${project.version}-runnable.jar"
+        def packageDir = layout.buildDirectory.dir(appDisplayName).get().asFile
+        def iniFile = new File(packageDir, "${appDisplayName}.ini")
+
+        delete(new File(packageDir, runnableJarName))
+        if (iniFile.exists()) {
+            def iniLines = iniFile.readLines('UTF-8')
+                    .findAll { it != "classpath.2=${runnableJarName}" }
+            iniFile.setText(iniLines.join(System.lineSeparator()) + System.lineSeparator(), 'UTF-8')
+        }
+    }
 
 }
-

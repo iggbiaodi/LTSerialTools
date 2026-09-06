@@ -35,6 +35,7 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 public class AboutDialog extends Dialog<Void> {
 
@@ -46,8 +47,8 @@ public class AboutDialog extends Dialog<Void> {
     private static final double FEEDBACK_QR_SIZE = 96;
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
-    private final Label versionLabel = createAboutLabel("版本: 正在获取...");
-    private final Label updateDateLabel = createAboutLabel("更新日期: 正在获取...");
+    private final Label versionLabel = createAboutLabel("版本: " + BaseStage.APP_VERSION);
+    private final Label updateDateLabel = createAboutLabel("更新日期: 点击检查更新获取");
     private final Button checkUpdateButton = new Button("检查更新");
 
     private ReleaseInfo latestRelease;
@@ -74,13 +75,12 @@ public class AboutDialog extends Dialog<Void> {
         dialogPane.setPrefWidth(700);
         FontSettingsManager.configureDialog(this);
 
-        refreshReleaseInfo(false);
     }
 
     private VBox createContent() {
         VBox content = new VBox(6);
-        content.setAlignment(Pos.TOP_CENTER);
-        content.setPadding(new Insets(8, 12, 0, 12));
+        content.setAlignment(Pos.TOP_LEFT);
+        content.setPadding(new Insets(10, 12, 8, 12));
         content.setPrefWidth(670);
         content.setStyle("-fx-background-color: -color-bg-default;");
 
@@ -90,24 +90,24 @@ public class AboutDialog extends Dialog<Void> {
         logoView.setPreserveRatio(true);
 
         Label titleLabel = new Label(BaseStage.APP_NAME);
-        titleLabel.setAlignment(Pos.CENTER);
+        titleLabel.setAlignment(Pos.CENTER_LEFT);
         titleLabel.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: -color-fg-default;");
 
         HBox titleBox = new HBox(10, logoView, titleLabel);
-        titleBox.setAlignment(Pos.CENTER);
+        titleBox.setAlignment(Pos.CENTER_LEFT);
         titleBox.setMaxWidth(Double.MAX_VALUE);
 
         Separator separator = new Separator();
         separator.setMaxWidth(Double.MAX_VALUE);
 
-        HBox infoBox = new HBox(14);
-        infoBox.setAlignment(Pos.CENTER);
-        infoBox.setPadding(new Insets(6, 16, 12, 16));
+        HBox infoBox = new HBox(18);
+        infoBox.setAlignment(Pos.TOP_LEFT);
+        infoBox.setPadding(new Insets(4, 16, 12, 16));
         infoBox.setMaxWidth(Double.MAX_VALUE);
         infoBox.setStyle("-fx-background-color: -color-bg-default;");
 
         VBox textInfoBox = new VBox(9);
-        textInfoBox.setAlignment(Pos.TOP_CENTER);
+        textInfoBox.setAlignment(Pos.TOP_LEFT);
         textInfoBox.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(textInfoBox, Priority.ALWAYS);
 
@@ -116,7 +116,7 @@ public class AboutDialog extends Dialog<Void> {
 
         Hyperlink githubLink = new Hyperlink(GITHUB_URL);
         githubLink.setMaxWidth(Double.MAX_VALUE);
-        githubLink.setAlignment(Pos.CENTER);
+        githubLink.setAlignment(Pos.CENTER_LEFT);
         githubLink.setOnAction(event -> openUrl(GITHUB_URL));
 
         Button openGithubButton = new Button("打开 GitHub");
@@ -124,9 +124,10 @@ public class AboutDialog extends Dialog<Void> {
         checkUpdateButton.setOnAction(event -> checkForUpdates());
 
         HBox actionBox = new HBox(10, openGithubButton, checkUpdateButton);
-        actionBox.setAlignment(Pos.CENTER);
+        actionBox.setAlignment(Pos.CENTER_LEFT);
 
         textInfoBox.getChildren().addAll(
+                titleBox,
                 createAboutLabel("LTSerialTool是一款功能实用的串口调试助手"),
                 createAboutLabel("支持多串口接收、关键字过滤&&高亮、自定义背景、串口发送、自定义添加指令、定时发送、接收&&发送数据量统计、波形图实时绘制等功能。"),
                 authorTitle,
@@ -139,7 +140,7 @@ public class AboutDialog extends Dialog<Void> {
         );
         infoBox.getChildren().addAll(textInfoBox, createFeedbackQrBox());
 
-        content.getChildren().addAll(titleBox, separator, infoBox);
+        content.getChildren().add(infoBox);
         return content;
     }
 
@@ -150,35 +151,37 @@ public class AboutDialog extends Dialog<Void> {
         qrView.setPreserveRatio(true);
         qrView.setSmooth(false);
 
-        Label titleLabel = createAboutLabel("微信公众号");
+        Label titleLabel = createCenteredAboutLabel("微信公众号");
         titleLabel.setStyle(titleLabel.getStyle() + " -fx-font-size: 12px; -fx-font-weight: bold;");
 
-        Label promptLabel = createAboutLabel("反馈与更新通知");
+        Label promptLabel = createCenteredAboutLabel("反馈与更新通知");
         promptLabel.setStyle(promptLabel.getStyle() + " -fx-font-size: 12px;");
 
         VBox qrBox = new VBox(4, qrView, titleLabel, promptLabel);
-        qrBox.setAlignment(Pos.CENTER);
+        qrBox.setAlignment(Pos.TOP_CENTER);
         qrBox.setMinWidth(122);
         qrBox.setPrefWidth(122);
         qrBox.setMaxWidth(122);
-        qrBox.setPadding(new Insets(0, 0, 0, 10));
+        qrBox.setPadding(new Insets(38, 0, 0, 10));
         qrBox.setStyle("-fx-border-color: -color-border-default; -fx-border-width: 0 0 0 1;");
         return qrBox;
     }
 
     private void refreshReleaseInfo(boolean showResult) {
-        versionLabel.setText("版本: 正在获取...");
+        versionLabel.setText("版本: " + BaseStage.APP_VERSION);
         updateDateLabel.setText("更新日期: 正在获取...");
         checkUpdateButton.setDisable(true);
 
         fetchLatestRelease().whenComplete((releaseInfo, throwable) -> Platform.runLater(() -> {
             checkUpdateButton.setDisable(false);
             if (throwable != null) {
-                LOG.warn("获取 GitHub Release 信息失败", throwable);
-                versionLabel.setText("版本: 获取失败");
+                String errorMessage = getReleaseErrorMessage(throwable);
+                LOG.warn("获取 GitHub Release 信息失败: {}", errorMessage);
+                LOG.debug("获取 GitHub Release 信息失败", unwrapCompletionException(throwable));
+                versionLabel.setText("版本: " + BaseStage.APP_VERSION);
                 updateDateLabel.setText("更新日期: 获取失败");
                 if (showResult) {
-                    showInfoAlert("检查更新失败", "无法获取 GitHub 最新版本信息");
+                    showInfoAlert("检查更新失败", "无法获取 GitHub 最新版本信息\n" + errorMessage);
                 }
                 return;
             }
@@ -201,21 +204,64 @@ public class AboutDialog extends Dialog<Void> {
         return HTTP_CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                        throw new IllegalStateException("GitHub API status: " + response.statusCode());
+                        throw new ReleaseFetchException(formatHttpError(response.statusCode(), response.body()));
                     }
                     JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
                     String tagName = getJsonString(json, "tag_name");
                     String publishedAt = getJsonString(json, "published_at");
                     String htmlUrl = getJsonString(json, "html_url");
                     if (isBlank(tagName)) {
-                        throw new IllegalStateException("GitHub Release tag_name is empty");
+                        throw new ReleaseFetchException("GitHub Release 信息缺少版本号");
                     }
                     return new ReleaseInfo(tagName, formatPublishedDate(publishedAt), isBlank(htmlUrl) ? RELEASES_URL : htmlUrl);
                 });
     }
 
+    private static String formatHttpError(int statusCode, String responseBody) {
+        String githubMessage = getGithubErrorMessage(responseBody);
+        if (statusCode == 403 && githubMessage.toLowerCase().contains("rate limit exceeded")) {
+            return "GitHub API 访问频率受限，请稍后再试";
+        }
+        if (statusCode == 403) {
+            return "GitHub API 返回 403，可能已触发访问限制";
+        }
+        if (!isBlank(githubMessage)) {
+            return "GitHub API 返回状态码: " + statusCode + "，" + githubMessage;
+        }
+        return "GitHub API 返回状态码: " + statusCode;
+    }
+
+    private static String getGithubErrorMessage(String responseBody) {
+        if (isBlank(responseBody)) {
+            return "";
+        }
+        try {
+            JsonObject json = JsonParser.parseString(responseBody).getAsJsonObject();
+            return getJsonString(json, "message");
+        } catch (Exception ex) {
+            return "";
+        }
+    }
+
+    private static String getReleaseErrorMessage(Throwable throwable) {
+        Throwable cause = unwrapCompletionException(throwable);
+        String message = cause.getMessage();
+        if (isBlank(message)) {
+            return cause.getClass().getSimpleName();
+        }
+        return message;
+    }
+
+    private static Throwable unwrapCompletionException(Throwable throwable) {
+        Throwable current = throwable;
+        while (current instanceof CompletionException && current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current;
+    }
+
     private void updateReleaseLabels(ReleaseInfo releaseInfo) {
-        versionLabel.setText("版本: " + releaseInfo.tagName());
+        versionLabel.setText("版本: " + BaseStage.APP_VERSION);
         updateDateLabel.setText("更新日期: " + releaseInfo.publishedDate());
     }
 
@@ -262,11 +308,18 @@ public class AboutDialog extends Dialog<Void> {
 
     private Label createAboutLabel(String text) {
         Label label = new Label(text);
-        label.setAlignment(Pos.CENTER);
+        label.setAlignment(Pos.CENTER_LEFT);
         label.setMaxWidth(Double.MAX_VALUE);
         label.setWrapText(true);
-        label.setTextAlignment(TextAlignment.CENTER);
+        label.setTextAlignment(TextAlignment.LEFT);
         label.setStyle("-fx-text-fill: -color-fg-default;");
+        return label;
+    }
+
+    private Label createCenteredAboutLabel(String text) {
+        Label label = createAboutLabel(text);
+        label.setAlignment(Pos.CENTER);
+        label.setTextAlignment(TextAlignment.CENTER);
         return label;
     }
 
@@ -350,5 +403,11 @@ public class AboutDialog extends Dialog<Void> {
     }
 
     private record ReleaseInfo(String tagName, String publishedDate, String htmlUrl) {
+    }
+
+    private static class ReleaseFetchException extends RuntimeException {
+        private ReleaseFetchException(String message) {
+            super(message);
+        }
     }
 }

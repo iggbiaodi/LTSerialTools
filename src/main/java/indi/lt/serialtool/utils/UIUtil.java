@@ -1,5 +1,7 @@
 package indi.lt.serialtool.utils;
 
+import github.nonoas.jfx.flat.ui.AppState;
+import github.nonoas.jfx.flat.ui.stage.ToastQueue;
 import javafx.scene.control.ComboBox;
 
 /**
@@ -41,7 +43,6 @@ public class UIUtil {
      * @param message 提示信息
      */
     public static void showToast(String message) {
-        // 这里可以添加实际的 Toast 实现
-        System.out.println("Toast: " + message);
+        ToastQueue.show(AppState.getStage(), message, 800);
     }
 }
