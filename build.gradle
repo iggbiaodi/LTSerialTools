@@ -3,6 +3,9 @@ import io.github.fvarrui.javapackager.model.HeaderType
 import io.github.fvarrui.javapackager.model.WindowsExeCreationTool
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
 buildscript {
     repositories {
         mavenLocal()
@@ -43,10 +46,12 @@ def generatedResourcesDir = layout.buildDirectory.dir('generated/resources/main'
 tasks.register('generateAppVersion') {
     def versionFile = generatedResourcesDir.map { it.file('app.properties') }
     outputs.file(versionFile)
+    outputs.upToDateWhen { false }
     doLast {
         def outputFile = versionFile.get().asFile
         outputFile.parentFile.mkdirs()
-        outputFile.text = "app.version=${project.version}\n"
+        def buildTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern('yyyy-MM-dd HH:mm:ss'))
+        outputFile.setText("app.version=${project.version}\napp.build.time=${buildTime}\n", 'UTF-8')
     }
 }
 

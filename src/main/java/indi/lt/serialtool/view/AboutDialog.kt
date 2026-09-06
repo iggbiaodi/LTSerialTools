@@ -1,413 +1,460 @@
-package indi.lt.serialtool.view;
+package indi.lt.serialtool.view
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import indi.lt.serialtool.global.FontSettingsManager;
-import javafx.application.Platform;
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
-import javafx.scene.Node;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.Dialog;
-import javafx.scene.control.DialogPane;
-import javafx.scene.control.Hyperlink;
-import javafx.scene.control.Label;
-import javafx.scene.control.Separator;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.VBox;
-import javafx.scene.text.TextAlignment;
-import javafx.stage.Window;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
+import indi.lt.serialtool.global.FontSettingsManager
+import javafx.application.Platform
+import javafx.geometry.Insets
+import javafx.geometry.Pos
+import javafx.scene.control.Alert
+import javafx.scene.control.Button
+import javafx.scene.control.ButtonType
+import javafx.scene.control.Dialog
+import javafx.scene.control.Hyperlink
+import javafx.scene.control.Label
+import javafx.scene.control.Separator
+import javafx.scene.image.Image
+import javafx.scene.image.ImageView
+import javafx.scene.layout.HBox
+import javafx.scene.layout.Priority
+import javafx.scene.layout.VBox
+import javafx.scene.text.TextAlignment
+import javafx.stage.Window
+import org.apache.logging.log4j.LogManager
+import java.awt.Desktop
+import java.net.URI
+import java.net.URLDecoder
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.nio.charset.StandardCharsets
+import java.time.Duration
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
+import kotlin.math.max
 
-import java.awt.Desktop;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
+class AboutDialog(owner: Window?) : Dialog<Void?>() {
+    private val versionLabel = createAboutLabel(versionText())
+    private val updateDateLabel = createAboutLabel(buildTimeText())
+    private val checkUpdateButton = Button("检查更新")
 
-public class AboutDialog extends Dialog<Void> {
+    init {
+        title = "关于${BaseStage.APP_NAME}"
+        headerText = null
+        graphic = null
+        isResizable = false
+        owner?.let(::initOwner)
 
-    private static final Logger LOG = LogManager.getLogger(AboutDialog.class);
-    private static final String GITHUB_URL = "https://github.com/iggbiaodi/LTSerialTools";
-    private static final String LATEST_RELEASE_API = "https://api.github.com/repos/iggbiaodi/LTSerialTools/releases/latest";
-    private static final String RELEASES_URL = GITHUB_URL + "/releases";
-    private static final String FEEDBACK_QR_IMAGE = "/image/wechat-feedback-qr.jpg";
-    private static final double FEEDBACK_QR_SIZE = 96;
-    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
-
-    private final Label versionLabel = createAboutLabel("版本: " + BaseStage.APP_VERSION);
-    private final Label updateDateLabel = createAboutLabel("更新日期: 点击检查更新获取");
-    private final Button checkUpdateButton = new Button("检查更新");
-
-    private ReleaseInfo latestRelease;
-
-    public AboutDialog(Window owner) {
-        setTitle("关于" + BaseStage.APP_NAME);
-        setHeaderText(null);
-        setGraphic(null);
-        setResizable(false);
-        if (owner != null) {
-            initOwner(owner);
+        dialogPane.apply {
+            buttonTypes += ButtonType.CLOSE
+            lookupButton(ButtonType.CLOSE)?.apply {
+                isVisible = false
+                isManaged = false
+            }
+            content = createContent()
+            minWidth = 700.0
+            prefWidth = 700.0
         }
 
-        DialogPane dialogPane = getDialogPane();
-        dialogPane.getButtonTypes().add(ButtonType.CLOSE);
-        Node closeButton = dialogPane.lookupButton(ButtonType.CLOSE);
-        if (closeButton != null) {
-            closeButton.setVisible(false);
-            closeButton.setManaged(false);
-        }
-
-        dialogPane.setContent(createContent());
-        dialogPane.setMinWidth(700);
-        dialogPane.setPrefWidth(700);
-        FontSettingsManager.configureDialog(this);
-
+        FontSettingsManager.configureDialog(this)
     }
 
-    private VBox createContent() {
-        VBox content = new VBox(6);
-        content.setAlignment(Pos.TOP_LEFT);
-        content.setPadding(new Insets(10, 12, 8, 12));
-        content.setPrefWidth(670);
-        content.setStyle("-fx-background-color: -color-bg-default;");
+    private fun createContent() = VBox(6.0).apply {
+        alignment = Pos.TOP_LEFT
+        padding = Insets(10.0, 12.0, 8.0, 12.0)
+        prefWidth = 670.0
+        style = "-fx-background-color: -color-bg-default;"
 
-        ImageView logoView = new ImageView(FontSettingsManager.loadAppIcon());
-        logoView.setFitWidth(36);
-        logoView.setFitHeight(36);
-        logoView.setPreserveRatio(true);
+        val logoView = ImageView(FontSettingsManager.loadAppIcon()).apply {
+            fitWidth = 36.0
+            fitHeight = 36.0
+            isPreserveRatio = true
+        }
 
-        Label titleLabel = new Label(BaseStage.APP_NAME);
-        titleLabel.setAlignment(Pos.CENTER_LEFT);
-        titleLabel.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: -color-fg-default;");
+        val titleLabel = Label(BaseStage.APP_NAME).apply {
+            alignment = Pos.CENTER_LEFT
+            style = "-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: -color-fg-default;"
+        }
 
-        HBox titleBox = new HBox(10, logoView, titleLabel);
-        titleBox.setAlignment(Pos.CENTER_LEFT);
-        titleBox.setMaxWidth(Double.MAX_VALUE);
+        val titleBox = HBox(10.0, logoView, titleLabel).apply {
+            alignment = Pos.CENTER_LEFT
+            maxWidth = Double.MAX_VALUE
+        }
 
-        Separator separator = new Separator();
-        separator.setMaxWidth(Double.MAX_VALUE);
+        val authorTitle = createAboutLabel("关于作者:").apply {
+            style += " -fx-font-weight: bold;"
+        }
 
-        HBox infoBox = new HBox(18);
-        infoBox.setAlignment(Pos.TOP_LEFT);
-        infoBox.setPadding(new Insets(4, 16, 12, 16));
-        infoBox.setMaxWidth(Double.MAX_VALUE);
-        infoBox.setStyle("-fx-background-color: -color-bg-default;");
+        val githubLink = Hyperlink(GITHUB_URL).apply {
+            maxWidth = Double.MAX_VALUE
+            alignment = Pos.CENTER_LEFT
+            setOnAction { openUrl(GITHUB_URL) }
+        }
 
-        VBox textInfoBox = new VBox(9);
-        textInfoBox.setAlignment(Pos.TOP_LEFT);
-        textInfoBox.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(textInfoBox, Priority.ALWAYS);
+        val openGithubButton = Button("打开 GitHub").apply {
+            setOnAction { openUrl(GITHUB_URL) }
+        }
+        checkUpdateButton.setOnAction { checkForUpdates() }
 
-        Label authorTitle = createAboutLabel("关于作者:");
-        authorTitle.setStyle(authorTitle.getStyle() + " -fx-font-weight: bold;");
+        val actionBox = HBox(10.0, openGithubButton, checkUpdateButton).apply {
+            alignment = Pos.CENTER_LEFT
+        }
 
-        Hyperlink githubLink = new Hyperlink(GITHUB_URL);
-        githubLink.setMaxWidth(Double.MAX_VALUE);
-        githubLink.setAlignment(Pos.CENTER_LEFT);
-        githubLink.setOnAction(event -> openUrl(GITHUB_URL));
-
-        Button openGithubButton = new Button("打开 GitHub");
-        openGithubButton.setOnAction(event -> openUrl(GITHUB_URL));
-        checkUpdateButton.setOnAction(event -> checkForUpdates());
-
-        HBox actionBox = new HBox(10, openGithubButton, checkUpdateButton);
-        actionBox.setAlignment(Pos.CENTER_LEFT);
-
-        textInfoBox.getChildren().addAll(
+        val textInfoBox = VBox(9.0).apply {
+            alignment = Pos.TOP_LEFT
+            maxWidth = Double.MAX_VALUE
+            HBox.setHgrow(this, Priority.ALWAYS)
+            children.addAll(
                 titleBox,
                 createAboutLabel("LTSerialTool是一款功能实用的串口调试助手"),
                 createAboutLabel("支持多串口接收、关键字过滤&&高亮、自定义背景、串口发送、自定义添加指令、定时发送、接收&&发送数据量统计、波形图实时绘制等功能。"),
                 authorTitle,
-                createAboutLabel("开发者: DaBiaoDi"),
+                createAboutLabel("开发者: iggbiaodi"),
                 createAboutLabel("联系方式: 1397018103@qq.com"),
                 githubLink,
                 versionLabel,
                 updateDateLabel,
                 actionBox
-        );
-        infoBox.getChildren().addAll(textInfoBox, createFeedbackQrBox());
+            )
+        }
 
-        content.getChildren().add(infoBox);
-        return content;
+        val infoBox = HBox(18.0, textInfoBox, createFeedbackQrBox()).apply {
+            alignment = Pos.TOP_LEFT
+            padding = Insets(4.0, 16.0, 12.0, 16.0)
+            maxWidth = Double.MAX_VALUE
+            style = "-fx-background-color: -color-bg-default;"
+        }
+
+        children += infoBox
     }
 
-    private VBox createFeedbackQrBox() {
-        ImageView qrView = new ImageView(new Image(Objects.requireNonNull(AboutDialog.class.getResourceAsStream(FEEDBACK_QR_IMAGE))));
-        qrView.setFitWidth(FEEDBACK_QR_SIZE);
-        qrView.setFitHeight(FEEDBACK_QR_SIZE);
-        qrView.setPreserveRatio(true);
-        qrView.setSmooth(false);
+    private fun createFeedbackQrBox(): VBox {
+        val qrImageUrl = checkNotNull(AboutDialog::class.java.getResource(FEEDBACK_QR_IMAGE)) {
+            "缺少微信公众号二维码图片: $FEEDBACK_QR_IMAGE"
+        }
 
-        Label titleLabel = createCenteredAboutLabel("微信公众号");
-        titleLabel.setStyle(titleLabel.getStyle() + " -fx-font-size: 12px; -fx-font-weight: bold;");
+        val qrView = ImageView(Image(qrImageUrl.toExternalForm())).apply {
+            fitWidth = FEEDBACK_QR_SIZE
+            fitHeight = FEEDBACK_QR_SIZE
+            isPreserveRatio = true
+            isSmooth = false
+        }
 
-        Label promptLabel = createCenteredAboutLabel("反馈与更新通知");
-        promptLabel.setStyle(promptLabel.getStyle() + " -fx-font-size: 12px;");
+        val titleLabel = createCenteredAboutLabel("微信公众号").apply {
+            style += " -fx-font-size: 12px; -fx-font-weight: bold;"
+        }
 
-        VBox qrBox = new VBox(4, qrView, titleLabel, promptLabel);
-        qrBox.setAlignment(Pos.TOP_CENTER);
-        qrBox.setMinWidth(122);
-        qrBox.setPrefWidth(122);
-        qrBox.setMaxWidth(122);
-        qrBox.setPadding(new Insets(38, 0, 0, 10));
-        qrBox.setStyle("-fx-border-color: -color-border-default; -fx-border-width: 0 0 0 1;");
-        return qrBox;
+        val promptLabel = createCenteredAboutLabel("反馈与更新通知").apply {
+            style += " -fx-font-size: 12px;"
+        }
+
+        return VBox(4.0, qrView, titleLabel, promptLabel).apply {
+            alignment = Pos.TOP_CENTER
+            minWidth = 122.0
+            prefWidth = 122.0
+            maxWidth = 122.0
+            padding = Insets(38.0, 0.0, 0.0, 10.0)
+            style = "-fx-border-color: -color-border-default; -fx-border-width: 0 0 0 1;"
+        }
     }
 
-    private void refreshReleaseInfo(boolean showResult) {
-        versionLabel.setText("版本: " + BaseStage.APP_VERSION);
-        updateDateLabel.setText("更新日期: 正在获取...");
-        checkUpdateButton.setDisable(true);
+    private fun refreshReleaseInfo(showResult: Boolean) {
+        resetLocalVersionLabels()
+        checkUpdateButton.isDisable = true
 
-        fetchLatestRelease().whenComplete((releaseInfo, throwable) -> Platform.runLater(() -> {
-            checkUpdateButton.setDisable(false);
-            if (throwable != null) {
-                String errorMessage = getReleaseErrorMessage(throwable);
-                LOG.warn("获取 GitHub Release 信息失败: {}", errorMessage);
-                LOG.debug("获取 GitHub Release 信息失败", unwrapCompletionException(throwable));
-                versionLabel.setText("版本: " + BaseStage.APP_VERSION);
-                updateDateLabel.setText("更新日期: 获取失败");
-                if (showResult) {
-                    showInfoAlert("检查更新失败", "无法获取 GitHub 最新版本信息\n" + errorMessage);
+        fetchLatestRelease().whenComplete { releaseInfo, throwable ->
+            Platform.runLater {
+                checkUpdateButton.isDisable = false
+
+                if (throwable != null) {
+                    val errorMessage = getReleaseErrorMessage(throwable)
+                    LOG.warn("获取 GitHub Release 信息失败: {}", errorMessage)
+                    LOG.debug("获取 GitHub Release 信息失败", unwrapCompletionException(throwable))
+                    resetLocalVersionLabels()
+                    if (showResult) {
+                        showInfoAlert("检查更新失败", "无法获取 GitHub 最新版本信息\n$errorMessage")
+                    }
+                } else {
+                    resetLocalVersionLabels()
+                    if (showResult && releaseInfo != null) {
+                        showUpdateResult(releaseInfo)
+                    }
                 }
-                return;
             }
-            latestRelease = releaseInfo;
-            updateReleaseLabels(releaseInfo);
-            if (showResult) {
-                showUpdateResult(releaseInfo);
-            }
-        }));
+        }
     }
 
-    private CompletableFuture<ReleaseInfo> fetchLatestRelease() {
-        HttpRequest request = HttpRequest.newBuilder(URI.create(LATEST_RELEASE_API))
-                .header("Accept", "application/vnd.github+json")
-                .header("User-Agent", BaseStage.APP_NAME)
-                .timeout(Duration.ofSeconds(10))
-                .GET()
-                .build();
+    private fun fetchLatestRelease(): CompletableFuture<ReleaseInfo> =
+        fetchLatestReleaseFromApi().exceptionallyCompose { apiThrowable ->
+            LOG.warn("GitHub API 获取失败，改用 Release 页面检查更新: {}", getReleaseErrorMessage(apiThrowable))
+
+            fetchLatestReleaseFromPage().exceptionallyCompose { pageThrowable ->
+                val apiError = getReleaseErrorMessage(apiThrowable)
+                val pageError = getReleaseErrorMessage(pageThrowable)
+                CompletableFuture.failedFuture(
+                    ReleaseFetchException("GitHub API 和 Release 页面均获取失败。API: $apiError；页面: $pageError")
+                )
+            }
+        }
+
+    private fun fetchLatestReleaseFromApi(): CompletableFuture<ReleaseInfo> {
+        val request = HttpRequest.newBuilder(URI.create(LATEST_RELEASE_API))
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", BaseStage.APP_NAME)
+            .timeout(Duration.ofSeconds(10))
+            .GET()
+            .build()
 
         return HTTP_CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> {
-                    if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                        throw new ReleaseFetchException(formatHttpError(response.statusCode(), response.body()));
-                    }
-                    JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
-                    String tagName = getJsonString(json, "tag_name");
-                    String publishedAt = getJsonString(json, "published_at");
-                    String htmlUrl = getJsonString(json, "html_url");
-                    if (isBlank(tagName)) {
-                        throw new ReleaseFetchException("GitHub Release 信息缺少版本号");
-                    }
-                    return new ReleaseInfo(tagName, formatPublishedDate(publishedAt), isBlank(htmlUrl) ? RELEASES_URL : htmlUrl);
-                });
-    }
-
-    private static String formatHttpError(int statusCode, String responseBody) {
-        String githubMessage = getGithubErrorMessage(responseBody);
-        if (statusCode == 403 && githubMessage.toLowerCase().contains("rate limit exceeded")) {
-            return "GitHub API 访问频率受限，请稍后再试";
-        }
-        if (statusCode == 403) {
-            return "GitHub API 返回 403，可能已触发访问限制";
-        }
-        if (!isBlank(githubMessage)) {
-            return "GitHub API 返回状态码: " + statusCode + "，" + githubMessage;
-        }
-        return "GitHub API 返回状态码: " + statusCode;
-    }
-
-    private static String getGithubErrorMessage(String responseBody) {
-        if (isBlank(responseBody)) {
-            return "";
-        }
-        try {
-            JsonObject json = JsonParser.parseString(responseBody).getAsJsonObject();
-            return getJsonString(json, "message");
-        } catch (Exception ex) {
-            return "";
-        }
-    }
-
-    private static String getReleaseErrorMessage(Throwable throwable) {
-        Throwable cause = unwrapCompletionException(throwable);
-        String message = cause.getMessage();
-        if (isBlank(message)) {
-            return cause.getClass().getSimpleName();
-        }
-        return message;
-    }
-
-    private static Throwable unwrapCompletionException(Throwable throwable) {
-        Throwable current = throwable;
-        while (current instanceof CompletionException && current.getCause() != null) {
-            current = current.getCause();
-        }
-        return current;
-    }
-
-    private void updateReleaseLabels(ReleaseInfo releaseInfo) {
-        versionLabel.setText("版本: " + BaseStage.APP_VERSION);
-        updateDateLabel.setText("更新日期: " + releaseInfo.publishedDate());
-    }
-
-    private void checkForUpdates() {
-        refreshReleaseInfo(true);
-    }
-
-    private void showUpdateResult(ReleaseInfo releaseInfo) {
-        int compareResult = compareVersions(releaseInfo.tagName(), BaseStage.APP_VERSION);
-        if (compareResult > 0) {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle("检查更新");
-            alert.setHeaderText("发现新版本: " + releaseInfo.tagName());
-            alert.setContentText("当前版本: " + BaseStage.APP_VERSION + "\n更新日期: " + releaseInfo.publishedDate());
-            ButtonType openRelease = new ButtonType("打开 Release");
-            alert.getButtonTypes().setAll(openRelease, ButtonType.CLOSE);
-            initChildDialog(alert);
-            alert.showAndWait().ifPresent(buttonType -> {
-                if (buttonType == openRelease) {
-                    openUrl(releaseInfo.htmlUrl());
+            .thenApply { response ->
+                if (response.statusCode() !in 200..299) {
+                    throw ReleaseFetchException(formatHttpError(response.statusCode(), response.body()))
                 }
-            });
-            return;
+
+                val json = JsonParser.parseString(response.body()).asJsonObject
+                val tagName = json.stringValue("tag_name")
+                val publishedAt = json.stringValue("published_at")
+                val htmlUrl = json.stringValue("html_url").ifBlank { RELEASES_URL }
+
+                if (tagName.isBlank()) {
+                    throw ReleaseFetchException("GitHub Release 信息缺少版本号")
+                }
+
+                ReleaseInfo(tagName, formatPublishedDate(publishedAt), htmlUrl)
+            }
+    }
+
+    private fun fetchLatestReleaseFromPage(): CompletableFuture<ReleaseInfo> {
+        val request = HttpRequest.newBuilder(URI.create(LATEST_RELEASE_PAGE))
+            .header("Accept", "text/html")
+            .header("User-Agent", BaseStage.APP_NAME)
+            .timeout(Duration.ofSeconds(10))
+            .GET()
+            .build()
+
+        return HTTP_CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+            .thenApply { response ->
+                if (response.statusCode() !in 200..299) {
+                    throw ReleaseFetchException("Release 页面返回状态码: ${response.statusCode()}")
+                }
+
+                val tagName = extractReleaseTagFromUri(response.uri())
+                    .ifBlank { extractReleaseTagFromHtml(response.body()) }
+
+                if (tagName.isBlank()) {
+                    throw ReleaseFetchException("Release 页面缺少版本号")
+                }
+
+                ReleaseInfo(tagName, extractReleaseDateFromHtml(response.body()), response.uri().toString())
+            }
+    }
+
+    private fun checkForUpdates() {
+        refreshReleaseInfo(true)
+    }
+
+    private fun resetLocalVersionLabels() {
+        versionLabel.text = versionText()
+        updateDateLabel.text = buildTimeText()
+    }
+
+    private fun showUpdateResult(releaseInfo: ReleaseInfo) {
+        if (compareVersions(releaseInfo.tagName, BaseStage.APP_VERSION) > 0) {
+            val openRelease = ButtonType("打开 Release")
+            Alert(Alert.AlertType.INFORMATION).apply {
+                title = "检查更新"
+                headerText = "发现新版本: ${releaseInfo.tagName}"
+                contentText = "当前版本: ${BaseStage.APP_VERSION}\n最新版本日期: ${releaseInfo.publishedDate}"
+                buttonTypes.setAll(openRelease, ButtonType.CLOSE)
+                initChildDialog(this)
+            }.showAndWait().ifPresent { buttonType ->
+                if (buttonType == openRelease) {
+                    openUrl(releaseInfo.htmlUrl)
+                }
+            }
+            return
         }
-        showInfoAlert("检查更新", "当前已是最新版本");
+
+        showInfoAlert("检查更新", "当前已是最新版本")
     }
 
-    private void showInfoAlert(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        initChildDialog(alert);
-        alert.showAndWait();
+    private fun showInfoAlert(title: String, message: String) {
+        Alert(Alert.AlertType.INFORMATION).apply {
+            this.title = title
+            headerText = null
+            contentText = message
+            initChildDialog(this)
+        }.showAndWait()
     }
 
-    private void initChildDialog(Dialog<?> dialog) {
-        Window owner = getDialogPane().getScene() == null ? null : getDialogPane().getScene().getWindow();
-        if (owner != null) {
-            dialog.initOwner(owner);
-        }
-        FontSettingsManager.configureDialog(dialog);
+    private fun initChildDialog(dialog: Dialog<*>) {
+        dialogPane.scene?.window?.let(dialog::initOwner)
+        FontSettingsManager.configureDialog(dialog)
     }
 
-    private Label createAboutLabel(String text) {
-        Label label = new Label(text);
-        label.setAlignment(Pos.CENTER_LEFT);
-        label.setMaxWidth(Double.MAX_VALUE);
-        label.setWrapText(true);
-        label.setTextAlignment(TextAlignment.LEFT);
-        label.setStyle("-fx-text-fill: -color-fg-default;");
-        return label;
+    private fun createAboutLabel(text: String) = Label(text).apply {
+        alignment = Pos.CENTER_LEFT
+        maxWidth = Double.MAX_VALUE
+        isWrapText = true
+        textAlignment = TextAlignment.LEFT
+        style = "-fx-text-fill: -color-fg-default;"
     }
 
-    private Label createCenteredAboutLabel(String text) {
-        Label label = createAboutLabel(text);
-        label.setAlignment(Pos.CENTER);
-        label.setTextAlignment(TextAlignment.CENTER);
-        return label;
+    private fun createCenteredAboutLabel(text: String) = createAboutLabel(text).apply {
+        alignment = Pos.CENTER
+        textAlignment = TextAlignment.CENTER
     }
 
-    private void openUrl(String url) {
+    private fun openUrl(url: String) {
         try {
             if (!Desktop.isDesktopSupported()) {
-                showInfoAlert("打开链接失败", "当前系统不支持打开浏览器");
-                return;
+                showInfoAlert("打开链接失败", "当前系统不支持打开浏览器")
+                return
             }
-            Desktop.getDesktop().browse(new URI(url));
-        } catch (Exception ex) {
-            LOG.warn("打开链接失败: {}", url, ex);
-            showInfoAlert("打开链接失败", url);
+            Desktop.getDesktop().browse(URI(url))
+        } catch (ex: Exception) {
+            LOG.warn("打开链接失败: {}", url, ex)
+            showInfoAlert("打开链接失败", url)
         }
     }
 
-    private static String getJsonString(JsonObject json, String name) {
-        if (json == null || !json.has(name) || json.get(name).isJsonNull()) {
-            return "";
-        }
-        return json.get(name).getAsString();
-    }
+    private data class ReleaseInfo(
+        val tagName: String,
+        val publishedDate: String,
+        val htmlUrl: String
+    )
 
-    private static String formatPublishedDate(String publishedAt) {
-        if (isBlank(publishedAt)) {
-            return "未知";
-        }
-        try {
-            return OffsetDateTime.parse(publishedAt).format(DateTimeFormatter.ISO_LOCAL_DATE);
-        } catch (Exception ex) {
-            return publishedAt;
-        }
-    }
+    private class ReleaseFetchException(message: String) : RuntimeException(message)
 
-    private static int compareVersions(String left, String right) {
-        String[] leftParts = normalizeVersion(left).split("\\.");
-        String[] rightParts = normalizeVersion(right).split("\\.");
-        int length = Math.max(leftParts.length, rightParts.length);
-        for (int i = 0; i < length; i++) {
-            int leftValue = i < leftParts.length ? parseVersionPart(leftParts[i]) : 0;
-            int rightValue = i < rightParts.length ? parseVersionPart(rightParts[i]) : 0;
-            if (leftValue != rightValue) {
-                return Integer.compare(leftValue, rightValue);
+    companion object {
+        private val LOG = LogManager.getLogger(AboutDialog::class.java)
+        private const val GITHUB_URL = "https://github.com/iggbiaodi/LTSerialTools"
+        private const val LATEST_RELEASE_API = "https://api.github.com/repos/iggbiaodi/LTSerialTools/releases/latest"
+        private const val RELEASES_URL = "https://github.com/iggbiaodi/LTSerialTools/releases"
+        private const val LATEST_RELEASE_PAGE = "https://github.com/iggbiaodi/LTSerialTools/releases/latest"
+        private const val RELEASE_TAG_MARKER = "/releases/tag/"
+        private const val FEEDBACK_QR_IMAGE = "/image/wechat-feedback-qr.jpg"
+        private const val FEEDBACK_QR_SIZE = 96.0
+        private val RELEASE_TAG_LINK_REGEX = Regex("""/iggbiaodi/LTSerialTools/releases/tag/([^"?#]+)""")
+        private val RELEASE_DATETIME_REGEX = Regex("""datetime="([^"]+)"""")
+        private val HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build()
+
+        private fun versionText() = "版本:\t ${BaseStage.APP_VERSION}"
+
+        private fun buildTimeText() = "更新日期:\t ${BaseStage.APP_BUILD_TIME}"
+
+        private fun formatHttpError(statusCode: Int, responseBody: String?): String {
+            val githubMessage = getGithubErrorMessage(responseBody)
+
+            return when {
+                statusCode == 403 && githubMessage.lowercase(Locale.ROOT).contains("rate limit exceeded") ->
+                    "GitHub API 访问频率受限，请稍后再试"
+                statusCode == 403 ->
+                    "GitHub API 返回 403，可能已触发访问限制"
+                githubMessage.isNotBlank() ->
+                    "GitHub API 返回状态码: $statusCode，$githubMessage"
+                else ->
+                    "GitHub API 返回状态码: $statusCode"
             }
         }
-        return 0;
-    }
 
-    private static String normalizeVersion(String version) {
-        if (version == null) {
-            return "";
-        }
-        String normalized = version.trim();
-        if (normalized.startsWith("v") || normalized.startsWith("V")) {
-            normalized = normalized.substring(1);
-        }
-        int suffixIndex = normalized.indexOf('-');
-        if (suffixIndex >= 0) {
-            normalized = normalized.substring(0, suffixIndex);
-        }
-        return normalized;
-    }
+        private fun getGithubErrorMessage(responseBody: String?): String =
+            responseBody
+                ?.takeIf(String::isNotBlank)
+                ?.let { body ->
+                    runCatching {
+                        JsonParser.parseString(body).asJsonObject.stringValue("message")
+                    }.getOrDefault("")
+                }
+                .orEmpty()
 
-    private static int parseVersionPart(String part) {
-        if (part == null || part.isBlank()) {
-            return 0;
+        private fun getReleaseErrorMessage(throwable: Throwable?): String {
+            val cause = throwable?.let(::unwrapCompletionException) ?: return "未知错误"
+            return cause.message?.takeIf(String::isNotBlank) ?: cause.javaClass.simpleName
         }
-        String digits = part.replaceAll("[^0-9].*$", "");
-        if (digits.isBlank()) {
-            return 0;
-        }
-        try {
-            return Integer.parseInt(digits);
-        } catch (NumberFormatException ex) {
-            return 0;
-        }
-    }
 
-    private static boolean isBlank(String value) {
-        return value == null || value.isBlank();
-    }
-
-    private record ReleaseInfo(String tagName, String publishedDate, String htmlUrl) {
-    }
-
-    private static class ReleaseFetchException extends RuntimeException {
-        private ReleaseFetchException(String message) {
-            super(message);
+        private fun unwrapCompletionException(throwable: Throwable): Throwable {
+            var current = throwable
+            while (current is CompletionException && current.cause != null) {
+                current = current.cause!!
+            }
+            return current
         }
+
+        private fun formatPublishedDate(publishedAt: String?): String =
+            publishedAt
+                ?.takeIf(String::isNotBlank)
+                ?.let { value ->
+                    runCatching {
+                        OffsetDateTime.parse(value).format(DateTimeFormatter.ISO_LOCAL_DATE)
+                    }.getOrDefault(value)
+                }
+                ?: "未知"
+
+        private fun extractReleaseTagFromUri(uri: URI): String =
+            uri.path
+                ?.substringAfter(RELEASE_TAG_MARKER, missingDelimiterValue = "")
+                ?.takeIf(String::isNotBlank)
+                ?.decodeUrl()
+                .orEmpty()
+
+        private fun extractReleaseTagFromHtml(html: String?): String =
+            html
+                ?.takeIf(String::isNotBlank)
+                ?.let { RELEASE_TAG_LINK_REGEX.find(it)?.groupValues?.getOrNull(1) }
+                ?.decodeUrl()
+                .orEmpty()
+
+        private fun extractReleaseDateFromHtml(html: String?): String =
+            html
+                ?.takeIf(String::isNotBlank)
+                ?.let { RELEASE_DATETIME_REGEX.find(it)?.groupValues?.getOrNull(1) }
+                ?.let(::formatPublishedDate)
+                ?: "未知"
+
+        private fun compareVersions(left: String?, right: String?): Int {
+            val leftParts = normalizedVersionParts(left)
+            val rightParts = normalizedVersionParts(right)
+            val length = max(leftParts.size, rightParts.size)
+
+            for (index in 0 until length) {
+                val leftValue = leftParts.getOrElse(index) { 0 }
+                val rightValue = rightParts.getOrElse(index) { 0 }
+
+                if (leftValue != rightValue) {
+                    return leftValue.compareTo(rightValue)
+                }
+            }
+
+            return 0
+        }
+
+        private fun normalizedVersionParts(version: String?): List<Int> =
+            version
+                ?.trim()
+                ?.let { if (it.startsWith("v", ignoreCase = true)) it.drop(1) else it }
+                ?.substringBefore('-')
+                ?.split('.')
+                ?.filter(String::isNotBlank)
+                ?.map(::parseVersionPart)
+                .orEmpty()
+
+        private fun parseVersionPart(part: String): Int =
+            part.takeWhile(Char::isDigit).toIntOrNull() ?: 0
+
+        private fun String.decodeUrl(): String =
+            URLDecoder.decode(this, StandardCharsets.UTF_8)
     }
 }
+
+private fun JsonObject.stringValue(name: String): String =
+    takeIf { has(name) && !get(name).isJsonNull }
+        ?.get(name)
+        ?.asString
+        .orEmpty()
