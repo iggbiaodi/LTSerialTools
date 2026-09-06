@@ -21,7 +21,9 @@ import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
@@ -30,7 +32,6 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
-import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -173,16 +174,12 @@ public class MainController implements Initializable {
         MenuItem cancelSplitItem = new MenuItem("取消拆分");
         cancelSplitItem.setOnAction(event -> moveTabToMain(tab));
 
-        MenuItem openWindowItem = new MenuItem("独立窗口打开");
-        openWindowItem.setOnAction(event -> openTabInWindow(tab));
-
-        MenuItem returnToTabItem = new MenuItem("回到标签页");
-        returnToTabItem.setOnAction(event -> returnTabToPane(tab));
+        MenuItem windowItem = new MenuItem();
 
         ContextMenu contextMenu = new ContextMenu(
                 splitLeftItem, splitRightItem, cancelSplitItem,
                 new SeparatorMenuItem(),
-                openWindowItem, returnToTabItem
+                windowItem
         );
         contextMenu.setOnShowing(event -> {
             TabPane owner = tab.getTabPane();
@@ -190,8 +187,14 @@ public class MainController implements Initializable {
             splitRightItem.setDisable(owner == null || owner == rightSplitTabPane);
             cancelSplitItem.setDisable(owner == null || owner == tabRootPane);
             boolean isDetached = detachedWindows.containsKey(tab);
-            openWindowItem.setVisible(!isDetached);
-            returnToTabItem.setVisible(isDetached);
+            windowItem.setText(isDetached ? "回到标签页" : "独立窗口打开");
+            windowItem.setOnAction(itemEvent -> {
+                if (isDetached) {
+                    returnTabToPane(tab);
+                } else {
+                    openTabInWindow(tab);
+                }
+            });
         });
         return contextMenu;
     }
@@ -253,18 +256,19 @@ public class MainController implements Initializable {
         if (content == null) {
             return;
         }
+        if (!(content instanceof Parent parentContent)) {
+            return;
+        }
         tab.setContent(new Label("已独立打开 - 右键标签页可回到标签页"));
 
-        BaseStage baseStage = new BaseStage();
-        ToolBar toolBar = new ToolBar();
-        toolBar.setMinHeight(40);
-        toolBar.getItems().add(createLogoView(28));
-        baseStage.registryDragger(toolBar);
-        VBox.setVgrow(content, Priority.ALWAYS);
-
         String originalTitle = tab.getText();
+        BaseStage baseStage = new BaseStage();
+        baseStage.getHeaderBar().getStyleClass().add("detached-window-title-bar");
+        baseStage.getHeaderBar().setLeading(createDetachedWindowTitle(originalTitle));
+        baseStage.registryDragger(baseStage.getHeaderBar());
+
         baseStage.setTitle(originalTitle + " - LTSerialTool");
-        baseStage.setContentView(new VBox(toolBar, content));
+        baseStage.setContentView(parentContent);
         baseStage.getStage().setOnHidden(event -> returnTabToPane(tab));
 
         detachedWindows.put(tab, baseStage);
@@ -394,6 +398,15 @@ public class MainController implements Initializable {
         logoView.setFitHeight(size);
         logoView.setPreserveRatio(true);
         return logoView;
+    }
+
+    private HBox createDetachedWindowTitle(String title) {
+        Label titleLabel = new Label(title);
+        titleLabel.getStyleClass().add("detached-window-title-text");
+
+        HBox titleBox = new HBox(8, createLogoView(22), titleLabel);
+        titleBox.setAlignment(Pos.CENTER_LEFT);
+        return titleBox;
     }
 
     /**

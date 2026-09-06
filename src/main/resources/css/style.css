@@ -53,6 +53,16 @@
     -fx-padding: 10px;
 }
 
+.detached-window-title-bar {
+    -fx-border-color: -color-border-default;
+    -fx-border-width: 0 0 1px 0;
+    -fx-border-style: solid;
+}
+
+.detached-window-title-text {
+    -fx-text-fill: -color-fg-default;
+}
+
 .titled-pane.non-border,
 .titled-pane.non-border > *,
 .titled-pane.non-border .title {

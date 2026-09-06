@@ -12,6 +12,10 @@
 
 [English](./README_EN.md) | **简体中文**
 
+<img src="src/main/resources/image/wechat-feedback-qr.jpg" alt="微信公众号二维码" width="120"/>
+
+<sub>扫码关注公众号，反馈问题并获取软件更新通知</sub>
+
 </div>
 
 ---

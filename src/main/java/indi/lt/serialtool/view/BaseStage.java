@@ -4,6 +4,10 @@ import github.nonoas.jfx.flat.ui.stage.AppStage;
 import indi.lt.serialtool.global.FontSettingsManager;
 import javafx.stage.Stage;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
+
 /**
  * 程序通用窗口，设置了一系列通用的样式和参数
  *
@@ -13,7 +17,9 @@ import javafx.stage.Stage;
 public class BaseStage extends AppStage {
 
     public static final String APP_NAME = "LTSerialTool";
-    public static final String APP_VERSION = "2.0.0";
+    private static final Properties APP_PROPERTIES = loadAppProperties();
+    public static final String APP_VERSION = getAppProperty("app.version", "未知版本");
+    public static final String APP_BUILD_TIME = getAppProperty("app.build.time", "未知");
 
     protected final String TITLE = APP_NAME + "-v" + APP_VERSION;
 
@@ -35,5 +41,24 @@ public class BaseStage extends AppStage {
             }
         }
         FontSettingsManager.applyAppIcon(getStage());
+    }
+
+    private static Properties loadAppProperties() {
+        Properties properties = new Properties();
+        try (InputStream inputStream = BaseStage.class.getResourceAsStream("/app.properties")) {
+            if (inputStream != null) {
+                properties.load(inputStream);
+            }
+        } catch (IOException ignored) {
+        }
+        return properties;
+    }
+
+    private static String getAppProperty(String key, String defaultValue) {
+        String value = APP_PROPERTIES.getProperty(key);
+        if (value != null && !value.isBlank()) {
+            return value.trim();
+        }
+        return defaultValue;
     }
 }
