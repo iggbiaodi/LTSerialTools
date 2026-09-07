@@ -192,13 +192,32 @@ tasks.register('packageMyApp', PackageTask) {
     doLast {
         def runnableJarName = "${appDisplayName}-${project.version}-runnable.jar"
         def packageDir = layout.buildDirectory.dir(appDisplayName).get().asFile
+        def libsDir = new File(packageDir, 'libs')
+        def appJarFile = layout.buildDirectory.file("libs/${project.name}-${project.version}.jar").get().asFile
         def iniFile = new File(packageDir, "${appDisplayName}.ini")
+        def zipFile = layout.buildDirectory.file("${appDisplayName}-${project.version}-windows.zip").get().asFile
+
+        if (!appJarFile.exists()) {
+            throw new GradleException("Application JAR not found: ${appJarFile}")
+        }
+
+        copy {
+            from appJarFile
+            into libsDir
+        }
 
         delete(new File(packageDir, runnableJarName))
+        delete(layout.buildDirectory.file(runnableJarName))
+
         if (iniFile.exists()) {
             def iniLines = iniFile.readLines('UTF-8')
                     .findAll { it != "classpath.2=${runnableJarName}" }
             iniFile.setText(iniLines.join(System.lineSeparator()) + System.lineSeparator(), 'UTF-8')
+        }
+
+        delete(zipFile)
+        ant.zip(destfile: zipFile, basedir: packageDir.parentFile) {
+            include(name: "${packageDir.name}/**")
         }
     }
 
